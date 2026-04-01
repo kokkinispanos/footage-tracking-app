@@ -1,0 +1,271 @@
+PRO PLACEMENT PROGRAM — Footage Tracker App (V1)
+Master Build Prompt for Antigravity
+
+CONTEXT & PURPOSE
+You are building a web application called “Pro Placement Program — Footage Tracker” for CKTraining Premium. This app serves one core purpose: give football (soccer) players a structured place to organize and submit their highlight clip links, and give the admin (the coach/program owner) a dashboard to track every player’s footage collection progress.
+This is NOT a file upload tool. Players paste links (Google Drive, YouTube, etc.) to their clips. The app organizes those links into the correct categories based on the footage submission guides the players receive.
+The app has two user types: 1. Players — CKTraining clients in the Pro Placement Program who sign up, fill in their profile, and start adding clip links organized by category. 2. Admin — The program owner (single admin) who logs in with a master password, sees ALL player accounts, their progress, their links, and can leave notes/feedback.
+
+REFERENCE DOCUMENTS (ALREADY IN YOUR PROJECT)
+You have access to these files — READ THEM FULLY before building: - Footage_Submission_Guide.pdf — The original step-by-step footage guide (12 pages). This defines what clips to collect, how to organize them, what photos are needed, and the folder structure. - footage_guide2.pdf — The expanded “Ultimate Footage Submission Guide” (35 pages). This goes deeper into every section: why footage matters, good vs bad clips, position-specific highlights, editing tips, the 6 essential photos, and submission instructions. - future_app_guidelines.docx — The architectural and UI/UX standards document. Follow these for app structure, interactivity, defensive programming, and aesthetic standards.
+CRITICAL: The clip categories, field names, section structure, and suggested clip counts in this prompt are ALL derived from these guides. If anything in this prompt seems unclear, refer back to the source guides for the definitive answer.
+
+AUTHENTICATION & ACCOUNTS
+Player Registration (Sign Up)
+When a new player creates an account, they fill in: - Full Name (required) - Email (required, used as login identifier) - Password (required, minimum 6 characters) - Primary Position (required — dropdown with these options): - Goalkeeper - Center Back - Full Back / Wing Back - Defensive Midfielder - Central Midfielder - Attacking Midfielder - Winger - Striker
+Player Login
+Email + Password
+Admin Login
+Completely separate login flow. On the login screen, there should be a subtle “Admin Access” link or toggle (not prominently displayed — players shouldn’t be confused by it).
+Admin logs in with:
+Username: admin
+Password: adminpw123 (placeholder for V1 development — will be replaced with proper Firebase Auth admin role before production deployment)
+Admin login redirects to the Admin Dashboard (completely different view from the player dashboard).
+
+PLAYER DASHBOARD
+After login, the player sees their personal dashboard. The dashboard is structured as a guided, section-based layout that mirrors the footage submission guide flow. Each section is a collapsible card/panel. The player works through them, adding links as they collect clips.
+Dashboard Header
+Welcome message with the player’s name
+Overall progress indicator (e.g., “12 of 20 clips submitted” with a visual progress bar)
+Profile section (clickable to edit their info: name, email, position)
+Section 1: Full Game Recordings
+Purpose: Players upload links to their complete match recordings (the raw source material they’ll cut clips from).
+Fields per entry: - Link (required — Google Drive, YouTube, or any URL) - Game Label (required — e.g., “League Match vs FC Athens — March 15”) - Date of Match (optional date picker) - Notes (optional — e.g., “My best game this season, scored 2 goals”)
+Guidance text shown to the player in this section: > “Upload links to your FULL match recordings. These should be real competitive games — league matches, tournament games, or full 11v11 friendlies. Record the entire game. These are the source videos you’ll cut your highlight clips from.”
+Suggested minimum: 2-3 full game recordings Show a counter: “X of 3 recommended full games added”
+CRUD: Player can Add, Edit, Delete, and Reorder entries freely.
+
+Section 2: Top 3 Best Clips (Highlight Opener)
+Purpose: The 3 absolute best clips that will open their highlight video. These are the money shots — the clips that grab a scout’s attention in the first 30 seconds.
+Fields per entry (exactly 3 slots): - Link (required) - Clip Title (required — e.g., “Long-range goal vs Olympiacos U19”) - Skill Category (required — dropdown: Dribbling, Passing & Vision, Defending, Finishing, Movement Off the Ball, Pressing/Hustle, Aerial, Other) - Why this is your best (optional short text — e.g., “This goal shows my shooting power and composure under pressure”)
+Guidance text: > “These are your 3 ABSOLUTE BEST moments. Scouts make their decision in the first 30 seconds — these clips must be explosive and grab attention immediately. Pick clips that show what makes YOU special.”
+Show 3 numbered slots (Clip #1, Clip #2, Clip #3). Each slot can be empty or filled. Visual indicator showing which slots are filled.
+CRUD: Player can Add, Edit, Delete, and Reorder (swap positions of #1, #2, #3).
+
+Section 3: Highlight Clips by Skill Category
+Purpose: The main body of clips, organized by skill type. This is where the bulk of the 10-20 clips go.
+This section has sub-sections (collapsible cards within the section), one per skill category:
+3a. Passing & Vision
+Through balls, switching the play, one-touch passes under pressure
+Suggested clips: 2-4
+3b. Dribbling
+Beating a defender 1v1, quick turns, skill moves in tight spaces
+Suggested clips: 2-4
+3c. Defending
+Tackling, intercepting, blocking, recovery runs, winning duels
+Suggested clips: 2-3
+3d. Finishing / Shooting
+Scoring goals, powerful strikes, volleys, shots on target
+Suggested clips: 2-4
+3e. Movement Off the Ball
+Making smart runs behind defense, showing for a pass, creating space
+Suggested clips: 1-3
+3f. Pressing & Hustle
+Chasing, recovering, helping teammates, work rate
+Suggested clips: 1-2
+3g. Aerial Ability (optional based on position)
+Winning headers, defensive clearances, attacking headers
+Suggested clips: 1-2
+3h. Other / Signature Skill
+Anything that doesn’t fit above but showcases the player’s unique quality
+Suggested clips: 0-3
+Each clip entry within any sub-section has these fields: - Link (required) - Clip Title (required — e.g., “Through ball assist vs Panathinaikos”) - Duration (optional — dropdown: “Under 6 sec”, “6-13 sec (ideal)”, “Over 13 sec”) - Notes (optional)
+Guidance text at the top of Section 3: > “Organize your clips by skill type. You need 10-20 clips total across all categories. Each clip should be 6-13 seconds long. Double down on your BEST skill — if dribbling is your thing, load up that section. Don’t try to cover everything equally. Repetition builds belief.”
+Per sub-section guidance: Show a short description of what belongs there (the text I wrote above for each) and the suggested clip count.
+Position-aware suggestions: Based on the player’s selected position, subtly highlight which categories matter most. For example: - Striker: Emphasize Finishing, Movement Off the Ball, Pressing - Center Back: Emphasize Defending, Aerial, Passing & Vision - Winger: Emphasize Dribbling, Finishing, Pressing - Goalkeeper: Show a completely different set of categories: Saves, Distribution, Commanding the Box, 1v1 Situations, Organizing Defense - Full Back: Emphasize Defending, Dribbling (overlapping runs), Passing - Central Midfielder: Emphasize Passing & Vision, Defending, Movement - Attacking Midfielder: Emphasize Passing & Vision, Dribbling, Finishing - Defensive Midfielder: Emphasize Defending, Pressing, Passing & Vision
+Show a small badge or star next to the categories most relevant to the player’s position with text like “Key for your position.”
+CRUD: Full Add, Edit, Delete, Reorder within each sub-section.
+Overall clip counter: At the top of Section 3, show “X of 10-20 recommended clips added” with a progress bar. Color-code: red under 5, amber 5-9, green 10+.
+
+Section 4: Player Photos (The 6 Essential Photos)
+Purpose: Players submit links to their 6 required professional photos.
+This section has 6 labeled slots, each requiring: - Photo Link (required — Google Drive link to the image) - Status indicator (filled / empty)
+The 6 photo slots are: 1. Clean Kit Photo — “Professional photo in your full kit. Clean background, good lighting.” 2. In-Game Action Shot — “Dynamic photo during a match — dribbling, passing, tackling.” 3. Training Photo — “You in training gear, showing work ethic and dedication.” 4. Headshot Portrait — “Clean head-and-shoulders portrait. Neutral background.” 5. Team Photo / Celebration — “With teammates — formal team photo or celebration moment.” 6. Lifestyle Photo — “Casual photo showing you as a person outside of football.”
+Guidance text: > “You need 6 high-quality photos for your player profile and CV. These are used in presentations to clubs. All photos should be well-lit, sharp, and high resolution (1080p minimum). Upload links to each photo below.”
+CRUD: Player can Add, Edit, Delete each photo link.
+
+Section 5: Google Drive Folder Link
+Purpose: A single field where the player pastes the link to their main Google Drive folder that contains everything.
+Fields: - Google Drive Folder Link (single URL field) - Sharing status reminder: Show a persistent note: “Make sure your folder is set to ‘Anyone with the link can view’ — otherwise we can’t access your files.”
+Guidance text: > “Paste the link to your main Google Drive folder (named Firstname_HighlightVideoClips). This folder should contain all your clips, photos, and documents organized in subfolders.”
+
+ADMIN DASHBOARD
+When the admin logs in, they see a completely different interface.
+Admin Overview Page
+Header: “Pro Placement Program — Admin Dashboard”
+Player count: Total registered players
+Player list/grid: All registered players displayed as cards or rows, each showing:
+Player name
+Position
+Email
+Registration date
+Overall progress bar (clips submitted vs 20 target)
+Section completion indicators (small icons/badges showing which of the 5 sections have content): Full Games ✓/✗, Top 3 ✓/✗, Skill Clips ✓/✗, Photos ✓/✗, Drive Link ✓/✗
+Quick-glance number: “X clips total”
+Sorting/filtering: Admin can sort players by name, date registered, or progress percentage. Admin can filter by position.
+Search: Simple text search to find a player by name.
+Individual Player View (Admin clicks into a player)
+The admin sees the EXACT same dashboard layout as the player, but in read-only mode with admin superpowers:
+All sections visible with all the player’s submitted links
+Every link is clickable and opens in a new tab
+Admin Notes per Clip: Next to each clip, there’s an “Add Note” button. Admin can type a note (e.g., “This clip is too long, trim to 10 sec” or “Great clip — use this as opener”). These notes are visible to the admin only (NOT shown to the player in V1).
+General Player Notes: At the top of the player view, there’s an “Admin Notes” text area where the admin can write general notes about this player (e.g., “Needs 3 more defending clips. Follow up on Friday.”). These are admin-only, not visible to the player.
+Admin can see the player’s profile info (name, email, position, registration date).
+Admin cannot edit the player’s clips (that’s the player’s job) but CAN leave notes.
+Admin Features
+Export: Button to export a player’s data as JSON (all their links, labels, categories, notes).
+Back button: Easy navigation back to the overview from any player view.
+
+DATA PERSISTENCE & ARCHITECTURE
+Storage
+Use a real-time database backend (Firebase Firestore recommended, or Supabase). All data syncs in real-time across devices.
+Fallback: If building without a backend initially, use robust localStorage with the app’s persistent storage API (window.storage). Structure the data so it can be migrated to a real database later.
+Auto-save: Every change the player makes is saved automatically. No “Save” button needed — changes persist instantly.
+Data Structure (per player)
+{
+  "uid": "unique_player_id",
+  "profile": {
+    "fullName": "Kwame Mensah",
+    "email": "kwame@email.com",
+    "position": "Winger",
+    "createdAt": "2026-04-01T12:00:00Z"
+  },
+  "fullGames": [
+    {
+      "id": "fg_001",
+      "link": "https://drive.google.com/...",
+      "label": "League Match vs FC Athens — March 15",
+      "date": "2026-03-15",
+      "notes": "Best game this season",
+      "order": 0
+    }
+  ],
+  "topThreeClips": [
+    {
+      "id": "t3_001",
+      "link": "https://drive.google.com/...",
+      "title": "Long-range goal",
+      "category": "Finishing",
+      "whyBest": "Shows my shooting power",
+      "order": 0
+    }
+  ],
+  "skillClips": {
+    "passing": [ { "id": "sc_001", "link": "...", "title": "...", "duration": "6-13 sec", "notes": "...", "order": 0 } ],
+    "dribbling": [],
+    "defending": [],
+    "finishing": [],
+    "movement": [],
+    "pressing": [],
+    "aerial": [],
+    "other": []
+  },
+  "photos": {
+    "cleanKit": { "link": "https://drive.google.com/..." },
+    "actionShot": { "link": "" },
+    "training": { "link": "" },
+    "headshot": { "link": "" },
+    "teamPhoto": { "link": "" },
+    "lifestyle": { "link": "" }
+  },
+  "driveFolder": {
+    "link": "https://drive.google.com/..."
+  },
+  "adminNotes": {
+    "general": "Needs more defending clips. Follow up Friday.",
+    "perClip": {
+      "sc_001": "Too long — trim to 10 seconds",
+      "t3_001": "Great clip, perfect for opener"
+    }
+  }
+}
+
+UI/UX DESIGN SPECIFICATIONS
+Brand Identity
+App Name: “Pro Placement Program” (displayed in header/logo area)
+Subtitle: “Footage Tracker” (smaller, below the name)
+Brand: CKTraining Premium
+Color Palette (Purple & Black — matching Footage Guide 1)
+Primary Background: Deep black / near-black (#0a0a0a or #111111)
+Secondary Background (cards/panels): Dark charcoal with slight transparency (#1a1a1a or rgba(255,255,255,0.05))
+Primary Accent: CKTraining Purple (#9B30FF or #8B5CF6 — match the purple from the footage guide)
+Secondary Accent: Lighter purple for hovers/highlights (#A855F7)
+Text Primary: Crisp white (#FFFFFF)
+Text Secondary: Light gray (#9CA3AF)
+Success/Complete: Emerald green (#10B981)
+Warning/Incomplete: Amber (#F59E0B)
+Error/Empty: Red (#EF4444)
+Borders: Subtle white/purple borders (border-white/10 or border-purple-500/20)
+Design Style
+Glassmorphism panels: Cards/sections use translucent dark backgrounds with subtle borders (matching the future_app_guidelines.docx specs: bg-white/5 border border-white/10).
+Typography: Bold, modern fonts. Use a strong display font for headings (something with character, not generic). Clean sans-serif for body text.
+Progress bars: Purple gradient fill on dark background.
+Micro-interactions: Smooth hover states, subtle scale effects on cards, fade-in animations when sections expand.
+Icons: Use relevant icons for each section (film icon for clips, camera for photos, folder for Drive link, etc.).
+Empty states: When a section has no content yet, show a helpful empty state with an icon, description text, and a prominent “Add” button. Never show a blank space.
+Responsive Design
+Desktop: Full sidebar navigation (sections listed as nav items) + main content area.
+Mobile: Bottom navigation bar, full-screen modals for adding/editing clips, collapsible sections.
+The app must work well on both phone and desktop since players may use either.
+
+INTERACTIVITY REQUIREMENTS (from guidelines doc)
+Full CRUD on Everything
+Every clip, photo link, game recording, and note must support: Create, Read, Update, Delete.
+Every list must support reordering (up/down arrows or drag-and-drop).
+Delete actions must show a confirmation prompt (“Are you sure you want to delete this clip?”).
+Edit mode uses inline editing or a modal — player clicks a pencil icon, fields become editable.
+Defensive Programming
+Default fallbacks: Never crash on missing data. Always provide sensible defaults.
+Empty states: Beautiful, helpful empty state messages with icons and CTAs.
+Event isolation: Buttons inside clickable cards must use e.stopPropagation().
+Loading states: Show skeleton loaders or spinners when data is loading.
+Auto-Save
+Every change saves automatically. Show a subtle “Saved” indicator (small checkmark or text that fades in/out) so the player knows their work is preserved.
+
+POSITION-SPECIFIC LOGIC
+When a player selects their position during registration (or updates it later), the app should adjust the Skill Clips section (Section 3) to reflect position-specific priorities.
+Goalkeeper — Special Case
+If position is Goalkeeper, replace the standard skill categories with: - Saves (especially difficult ones) — Suggested: 3-5 clips - Distribution (throws, kicks, goal kicks) — Suggested: 2-3 clips - Commanding the Box (crosses, corners, organizing) — Suggested: 2-3 clips - 1v1 Situations — Suggested: 2-3 clips - Organizing Defense (communication, positioning) — Suggested: 1-2 clips - Other / Signature Skill — Suggested: 0-2 clips
+All Other Positions
+Use the standard categories (Passing, Dribbling, Defending, Finishing, Movement, Pressing, Aerial, Other) but highlight the most relevant ones per position:
+Starred/primary categories get a small purple badge: “⭐ Key for your position”
+
+FEATURE SUMMARY CHECKLIST
+Player Features
+☐ Sign up with name, email, password, position
+☐ Log in with email + password
+☐ Edit profile (name, email, position)
+☐ Dashboard with 5 sections (Full Games, Top 3, Skill Clips, Photos, Drive Link)
+☐ Add/Edit/Delete/Reorder clip links in every section
+☐ See guidance text and suggested clip counts per section
+☐ See position-specific category priorities
+☐ Overall progress bar (total clips submitted vs target)
+☐ Per-section progress indicators
+☐ Auto-save on every change
+☐ Responsive design (mobile + desktop)
+Admin Features
+☐ Separate admin login (username: admin, password: adminpw123 — placeholder for V1)
+☐ Overview dashboard showing all players with progress
+☐ Sort/filter players by name, position, date, progress
+☐ Search players by name
+☐ Click into any player to see their full dashboard (read-only)
+☐ All player links are clickable (open in new tab)
+☐ Add notes per individual clip (admin-only, not visible to player)
+☐ Add general notes per player (admin-only, not visible to player)
+☐ Export player data as JSON
+V2 Features (NOT for V1 — future reference only)
+Clip status marking (Approved / Needs Redo / Pending) visible to player
+Cross-platform sync with Firebase/Supabase backend
+Offline mode with sync on reconnect
+Push notifications when admin leaves feedback
+Player-visible admin feedback
+
+IMPORTANT REMINDERS
+This app is about LINKS, not file uploads. Players paste URLs (Google Drive, YouTube, etc.). No file upload functionality needed.
+Read the footage guides thoroughly. The section structure, categories, photo requirements, and clip guidance all come from those documents. Do not invent categories or skip any that the guides mention.
+Follow the future_app_guidelines.docx for all architectural decisions, UI patterns, CRUD behavior, defensive programming, and aesthetic standards.
+The admin password is a placeholder for V1. adminpw123 is for development/testing only. Before production deployment, this will be replaced with proper Firebase Auth with admin roles. Do not expose the password in client-side code comments or UI elements.
+Auto-save everything. Players should never lose work. Every keystroke or link addition persists.
+Purple & Black branding. Match the CKTraining footage guide aesthetic — bold, premium, dark, with purple accents. This app represents a professional player development program.
+Empty states matter. A new player logging in for the first time should see a beautiful, guided, encouraging dashboard — not a blank screen. Every empty section should have helpful text and a clear CTA.
+Goalkeeper is a special case. Their clip categories are completely different from outfield players. Handle this with conditional rendering based on position.
