@@ -40,11 +40,18 @@ export function readableAuthError(err) {
     case 'auth/network-request-failed':
       return 'No connection. Check your internet and try again.';
     case 'auth/user-disabled':
-      return 'This account has been turned off. Contact Pro Placement.';
+      return 'This account has been turned off. Please contact Pro Placement.';
     case 'auth/operation-not-allowed':
-      return 'Email sign-in is not switched on for this project yet. Tell Panos.';
+    case 'auth/configuration-not-found':
+      // Firebase Auth has not been switched on for the project (MIGRATION.md, step 1).
+      return 'Sign-in is not switched on yet. Please contact Pro Placement — this is on our side, not yours.';
+    case 'auth/internal-error':
+      return 'Something went wrong at our end. Please try again in a moment.';
+    case 'auth/requires-recent-login':
+      return 'For your security, please sign in again before making that change.';
     default:
-      return err?.message?.replace('Firebase: ', '') || 'Something went wrong. Try again.';
+      // Never show a player a raw error code.
+      return 'Something went wrong. Please try again, or contact Pro Placement if it keeps happening.';
   }
 }
 
