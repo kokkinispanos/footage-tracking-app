@@ -7,12 +7,15 @@ rules_version = '2';
 // player's record, including their password in plain text. Everything below exists to
 // make sure that can never be true again.
 //
-// The two ideas:
+// The three ideas:
 //   1. A player can read and write HIS OWN record and nothing else. "His own" means the
 //      record whose `authUid` equals the id Firebase Auth gave him. Not his email — email
 //      lookups are what made the old version readable by everyone.
 //   2. An admin is someone with a document at `admins/{their uid}`. That document can only
 //      be created in the Firebase console. No code path in the app can grant admin.
+//   3. Admin notes live in their OWN collection, never on the player's record. Firestore
+//      hands back whole documents — it cannot hide one field from the person reading it —
+//      so a note kept on the player's record is a note the player can read.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -36,6 +39,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ------------------------------------------------------------- adminNotes
+    // What the coach writes about a player. Admins only, in every direction.
+    // The player must never be able to read these, which is why they are not on his record.
+    match /adminNotes/{playerId} {
+      allow read, write: if isAdmin();
+    }
+
     // ---------------------------------------------------------------- players
     match /players/{playerId} {
 
@@ -46,39 +56,52 @@ service cloud.firestore {
           && resource.data.authUid == request.auth.uid;
       }
 
-      // The sections a player may change on his own record. Anything not listed here —
-      // adminNotes, authUid, password, role — is refused by the server, whatever the
-      // browser tries to send. Kept in step with PLAYER_OWNED_KEYS in src/services/db.js.
+      // The only fields a record may ever contain, whoever is writing.
+      // Kept in step with PLAYER_OWNED_KEYS in src/services/db.js.
+      function sectionKeys() {
+        return [
+          'profile', 'fullGames', 'topThreeClips', 'skillClips', 'photos', 'driveFolder',
+          'identity', 'playerCard', 'contact', 'deliverables', 'platforms'
+        ];
+      }
+
+      // Three fields must never exist on a player record AFTER any write:
+      //   `password` and `role` — the two that caused the original leak;
+      //   `adminNotes` — because a note on the player's record is a note he can read.
+      // This is deliberately strict: it is a condition on the RESULT, not on the change.
+      // So the first admin write to an old record must clean it (both admin actions in
+      // src/services/db.js do exactly that: the notes are copied to the `adminNotes`
+      // collection, then all three fields are deleted). After the migration no record
+      // carries them and this is invisible.
+      function noSecrets() {
+        return !('password' in request.resource.data)
+          && !('role' in request.resource.data)
+          && !('adminNotes' in request.resource.data);
+      }
+
+      // What a player may change on his own record.
       function ownedKeysOnly() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'profile', 'fullGames', 'topThreeClips', 'skillClips', 'photos', 'driveFolder',
-          'identity', 'playerCard', 'contact', 'deliverables', 'platforms',
-          'updatedAt'
-        ]);
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(sectionKeys().concat(['updatedAt']));
       }
 
-      // What an admin may change: his notes, the sections (so he can repair a record and
-      // carry an old one across), and the bookkeeping fields of that migration. He may not
-      // create or delete records, and `authUid` is the one field that decides ownership —
-      // it is here only because the migration is the act of setting it.
+      // What an admin may change: the sections (so he can repair a record and carry an old
+      // one across) and the bookkeeping of that migration. NOT `authUid` — ownership is not
+      // his to reassign — and not `adminNotes`, which live in their own collection now.
       function adminKeysOnly() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'adminNotes',
-          'profile', 'fullGames', 'topThreeClips', 'skillClips', 'photos', 'driveFolder',
-          'identity', 'playerCard', 'contact', 'deliverables', 'platforms',
-          'authUid', 'password', 'role', 'linkedAt', 'mergedInto', 'updatedAt'
-        ]);
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(sectionKeys().concat([
+            'password', 'role', 'adminNotes',   // only ever removed, enforced by noSecrets()
+            'linkedAt', 'mergedInto', 'updatedAt'
+          ]));
       }
 
-      // A new record must be filed under the owner's own uid, must never carry a password or
-      // a role (the two fields that caused the original leak), and must not arrive with the
-      // admin's notes already in it — those are written by an admin, never by the player.
+      // A new record is filed under the owner's own uid and may contain NOTHING but the
+      // fields named here. An unknown field is refused rather than quietly stored.
       function validNewRecord() {
         return request.auth.uid == playerId
           && request.resource.data.authUid == request.auth.uid
-          && !('password' in request.resource.data)
-          && !('role' in request.resource.data)
-          && !('adminNotes' in request.resource.data);
+          && request.resource.data.keys().hasOnly(sectionKeys().concat(['authUid', 'updatedAt']));
       }
 
       // Reading his own record by id is allowed even before it exists, so a fresh signup
@@ -91,16 +114,18 @@ service cloud.firestore {
       // documents this rule refuses, so the server rejects the whole query.
       allow list: if isAdmin() || mine();
 
-      allow create: if signedIn() && validNewRecord();
+      allow create: if signedIn() && validNewRecord() && noSecrets();
 
-      allow update: if (mine() && ownedKeysOnly())
-                    || (isAdmin() && adminKeysOnly());
+      allow update: if noSecrets()
+                    && ((mine() && ownedKeysOnly())
+                        || (isAdmin() && adminKeysOnly()));
 
       // Records are never destroyed from the app. Client data is not disposable.
       allow delete: if false;
     }
 
-    // Anything not named above is closed.
+    // Anything not named above is closed. (Firestore ORs the allow rules, so this cannot
+    // take away access granted above — it is here to state the default out loud.)
     match /{document=**} {
       allow read, write: if false;
     }

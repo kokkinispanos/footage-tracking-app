@@ -18,7 +18,7 @@ const PHOTO_TYPES = [
   { key: 'lifestyle', label: 'Lifestyle', desc: 'Off the pitch, still professional.' },
 ];
 
-export function Section4Photos({ adminMode, overrideData, adminDocId }) {
+export function Section4Photos({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
   const updateSection = adminMode ? null : context.updateSection;
@@ -107,7 +107,7 @@ export function Section4Photos({ adminMode, overrideData, adminDocId }) {
                 <AdminNoteField
                   docId={adminDocId}
                   noteKey={`photo_${type.key}`}
-                  initialValue={playerData.adminNotes?.perClip?.[`photo_${type.key}`] || ''}
+                  initialValue={adminNotes?.perClip?.[`photo_${type.key}`] || ''}
                 />
               )}
             </div>

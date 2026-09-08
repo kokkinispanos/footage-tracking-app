@@ -30,10 +30,18 @@ player records, passwords in plain text included. Nothing else could be built un
 
 **The rules (the actual security)**
 - `firestore.rules` (new): a player reads and writes only his own record, and only the sections
-  he owns — not `adminNotes`, not `authUid`, not `password`. An admin may read all, write notes,
-  and carry an old record across. Nobody may delete. Everything not named is closed.
+  he owns — not `authUid`, not `password`. An admin may read every record and carry an old one
+  across. Nobody may delete. Everything not named is closed.
 - `storage.rules` (new): `players/{uid}/…`, owner or admin only, images and PDFs, 15 MB cap.
   Ready for the passport and CV uploads in stage 3.
+- **Admin notes moved to their own `adminNotes` collection.** They used to sit on the player's
+  record, and Firestore cannot hide a field from whoever reads the document — so the screen said
+  "the player never sees this" while the player could read every word in his browser. Found by
+  the Codex review; the old notes are carried over by the same admin button that cleans the record.
+- Creation is key-whitelisted (a player could otherwise store arbitrary extra fields on his own
+  record), `password` / `role` / `adminNotes` are now impossible to write on ANY operation rather
+  than merely absent by convention, and an admin can no longer reassign `authUid` — ownership is
+  not his to move.
 - `firebase.json` so the rules can be deployed by CLI later.
 
 **Old records**
@@ -71,6 +79,19 @@ player records, passwords in plain text included. Nothing else could be built un
   its config in the wrong place and every custom colour silently vanishes (the path has spaces).
 - ESLint config fixed: it was reporting components used only in JSX as unused. `npm run lint`
   is now 0 errors, 3 harmless fast-refresh warnings. `npm run build` clean.
+
+### Reviewed independently
+Codex (`gpt-5.6-sol`) audited the rules and the auth code. It confirmed: a stranger can read and
+write nothing; a player cannot read another record, escalate to admin, or write a field he does
+not own; the `authUid` query and the not-found path behave as intended; `affectedKeys()` and the
+Storage syntax are used correctly. Its four real findings are all fixed above. Its remaining
+advice is scheduled, not ignored:
+- **Before uploads land (checkpoint 3):** do not hand out Firebase tokenised download URLs for a
+  passport — possession of one bypasses the rules; restrict filenames and object counts; treat
+  the browser-reported MIME type as untrusted.
+- **Checkpoint 2:** rule tests on the Firebase emulator, which needs `firebase-tools` installed.
+- **Operational:** MFA on the admin account, and a retention/deletion policy once identity
+  documents exist.
 
 ### Verified
 - Build and lint clean. Login, signup and forgot-password render and behave, desktop and phone.

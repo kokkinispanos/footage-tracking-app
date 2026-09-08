@@ -15,7 +15,7 @@ const SUBFOLDERS = [
   '05_Photos',
 ];
 
-export function Section5Drive({ adminMode, overrideData, adminDocId }) {
+export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
   const updateSection = adminMode ? null : context.updateSection;
@@ -118,7 +118,7 @@ export function Section5Drive({ adminMode, overrideData, adminDocId }) {
         <AdminNoteField
           docId={adminDocId}
           noteKey="master_drive"
-          initialValue={playerData.adminNotes?.perClip?.master_drive || ''}
+          initialValue={adminNotes?.perClip?.master_drive || ''}
         />
       )}
     </SectionShell>

@@ -23,18 +23,22 @@ export function AdminPlayerDetail() {
   const { user, logout } = useAuth();
 
   const [playerData, setPlayerData] = useState(null);
+  const [adminNotes, setAdminNotes] = useState({ general: '', perClip: {} });
   const [loading, setLoading] = useState(true);
   const [generalNote, setGeneralNote] = useState('');
   const [noteStatus, setNoteStatus] = useState('idle');
   const timerRef = useRef(null);
 
+  // The record and the notes are two separate documents on purpose: notes live in an
+  // admin-only collection, because Firestore cannot hide a field from whoever reads the doc.
   useEffect(() => {
     let cancelled = false;
-    dbService.getPlayerById(id)
-      .then((player) => {
+    Promise.all([dbService.getPlayerById(id), dbService.getAdminNotes(id)])
+      .then(([player, notes]) => {
         if (cancelled) return;
         setPlayerData(player);
-        setGeneralNote(player?.adminNotes?.general || '');
+        setAdminNotes(notes);
+        setGeneralNote(notes?.general || '');
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -88,7 +92,7 @@ export function AdminPlayerDetail() {
   }
 
   const stats = calculateCompletion(playerData);
-  const shared = { adminMode: true, overrideData: playerData, adminDocId: id };
+  const shared = { adminMode: true, overrideData: playerData, adminDocId: id, adminNotes };
 
   return (
     <div className="min-h-dvh pb-20">
@@ -145,7 +149,9 @@ export function AdminPlayerDetail() {
             className="w-full bg-black/30 border border-white/10 rounded-xl p-3.5 text-sm text-ink placeholder:text-ink-faint
                        focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 min-h-[100px] resize-y transition-all"
           />
-          <p className="text-xs text-ink-faint">Only admins see this. The player never does.</p>
+          <p className="text-xs text-ink-faint">
+            Admins only. These are kept in a separate place the player cannot read.
+          </p>
         </GlassCard>
 
         <div className="space-y-5">

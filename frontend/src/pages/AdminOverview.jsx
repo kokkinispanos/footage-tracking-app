@@ -52,7 +52,7 @@ function LegacyPanel({ legacy, players, onLinked }) {
     setBusy(record.id);
     setError('');
     try {
-      await dbService.purgeLegacyPassword(record.id);
+      await dbService.purgeLegacyPassword(record);
       await onLinked();
     } catch (e) {
       setError(e?.message || 'Could not clear that password.');

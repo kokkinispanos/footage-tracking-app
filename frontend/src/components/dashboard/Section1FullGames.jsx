@@ -16,7 +16,7 @@ import { TARGETS } from '../../utils/completion';
 
 const BLANK = { link: '', label: '', date: '', notes: '' };
 
-export function Section1FullGames({ adminMode, overrideData, adminDocId }) {
+export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
   const updateSection = adminMode ? null : context.updateSection;
@@ -105,7 +105,7 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId }) {
                 <AdminNoteField
                   docId={adminDocId}
                   noteKey={`fullgame_${game.id}`}
-                  initialValue={playerData.adminNotes?.perClip?.[`fullgame_${game.id}`] || ''}
+                  initialValue={adminNotes?.perClip?.[`fullgame_${game.id}`] || ''}
                 />
               )}
             </ItemRow>

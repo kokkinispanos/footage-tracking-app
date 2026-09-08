@@ -12,11 +12,22 @@ import {
  *  2. A player is found by `authUid`, never by email. Looking a player up by email
  *     is what let anyone read anyone's record in the old version.
  *
- * New records use the Firebase Auth uid as their document id AND carry `authUid`.
- * Records made before September 2026 keep their old uuid id and have `authUid`
- * filled in when an admin links them (see `linkLegacyRecord`). Because every read
- * goes through `authUid`, both kinds behave identically everywhere else.
+ * A record's document id is always the owner's Firebase Auth uid, and it also carries
+ * `authUid`. Records made before September 2026 kept a random uuid as their id; rather
+ * than move them, `mergeLegacyRecord` copies their contents onto the player's real record
+ * once he has an account. See `firestore.rules` for what any of this is allowed to do.
  */
+
+/**
+ * The three fields that must never remain on a player record: the two that caused the
+ * original leak, and the notes that belong in the admin-only collection. `noSecrets()` in
+ * firestore.rules refuses any write that leaves one of them behind.
+ */
+const LEGACY_CLEANUP = {
+  password: deleteField(),
+  role: deleteField(),
+  adminNotes: deleteField(),
+};
 
 /** The only top-level keys a player may write on his own record. Mirrored in firestore.rules. */
 export const PLAYER_OWNED_KEYS = [
@@ -126,20 +137,37 @@ export const dbService = {
   },
 
   /**
-   * Write ONE admin note at its own field path.
+   * The coach's private notes about a player.
+   *
+   * They live in their OWN collection, not on the player's record, and the rules make that
+   * collection admin-only in both directions. This is not tidiness: Firestore hands back a
+   * whole document, so a note kept on the player's record is a note the player can read in
+   * his browser's network tab, whatever the screen says. The old app kept them there.
+   */
+  async getAdminNotes(playerDocId) {
+    const snap = await getDoc(doc(db, 'adminNotes', playerDocId));
+    return snap.exists() ? snap.data() : { general: '', perClip: {} };
+  },
+
+  /**
+   * Write ONE note at its own field path.
    * The old version read the whole document, merged in memory and wrote it back, so two
    * notes saved within a second of each other lost one. A field-path write cannot do that.
    * An empty string deletes the note (the old version could never delete one).
    */
-  async setClipNote(docId, noteKey, text) {
-    const path = new FieldPath('adminNotes', 'perClip', noteKey);
+  async setClipNote(playerDocId, noteKey, text) {
+    const ref = doc(db, 'adminNotes', playerDocId);
     const value = (text ?? '').trim() === '' ? deleteField() : text;
-    await updateDoc(doc(db, 'players', docId), path, value);
+    try {
+      await updateDoc(ref, new FieldPath('perClip', noteKey), value);
+    } catch {
+      // First note for this player: the document does not exist yet.
+      await setDoc(ref, { general: '', perClip: { [noteKey]: (text ?? '') } }, { merge: true });
+    }
   },
 
-  async setGeneralNote(docId, text) {
-    const path = new FieldPath('adminNotes', 'general');
-    await updateDoc(doc(db, 'players', docId), path, text ?? '');
+  async setGeneralNote(playerDocId, text) {
+    await setDoc(doc(db, 'adminNotes', playerDocId), { general: text ?? '' }, { merge: true });
   },
 
   // ------------------------------------------------- legacy records (pre-Sept 2026)
@@ -169,7 +197,6 @@ export const dbService = {
       // `profile` is skipped on purpose: the name and email he just typed are the current ones.
       if (key !== 'profile' && legacyRecord[key] !== undefined) carried[key] = legacyRecord[key];
     }
-    if (legacyRecord.adminNotes) carried.adminNotes = legacyRecord.adminNotes;
 
     if (Object.keys(carried).length > 0) {
       await updateDoc(doc(db, 'players', targetDocId), {
@@ -178,19 +205,26 @@ export const dbService = {
       });
     }
 
+    // The old app kept notes ON the player's record, where he could read them. Move them.
+    if (legacyRecord.adminNotes) {
+      await setDoc(doc(db, 'adminNotes', targetDocId), legacyRecord.adminNotes, { merge: true });
+    }
+
     await updateDoc(doc(db, 'players', legacyRecord.id), {
-      password: deleteField(),
-      role: deleteField(),
+      ...LEGACY_CLEANUP,
       mergedInto: targetDocId,
       linkedAt: serverTimestamp(),
     });
   },
 
-  /** Strip the stored password from an old record without linking it yet. */
-  async purgeLegacyPassword(legacyDocId) {
-    await updateDoc(doc(db, 'players', legacyDocId), {
-      password: deleteField(),
-      role: deleteField(),
-    });
+  /**
+   * Clean an old record without carrying it across yet: the stored password goes, and any
+   * notes on it move to the admin-only collection where the player cannot read them.
+   */
+  async purgeLegacyPassword(legacyRecord) {
+    if (legacyRecord.adminNotes) {
+      await setDoc(doc(db, 'adminNotes', legacyRecord.id), legacyRecord.adminNotes, { merge: true });
+    }
+    await updateDoc(doc(db, 'players', legacyRecord.id), LEGACY_CLEANUP);
   },
 };

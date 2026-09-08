@@ -89,7 +89,14 @@ app never gave them a real account.
    records. When the emails match, the record shows a **Bring across** button. Press it. His old
    clips are copied onto his new account (the old record is kept, untouched, as a backup).
 3. Any record still showing **Clear password** — press it now, whether or not he has registered.
-   That deletes the password the old app saved.
+   That deletes the password the old app saved, and moves any notes you wrote about him into the
+   admin-only collection at the same time.
+
+**Why the notes had to move.** Firestore hands back whole documents; it cannot hide one field from
+whoever is reading. Your notes lived on the player's own record, so anything you typed there was
+readable by that player in his browser, whatever the screen said. They now live in their own
+collection that only an admin can open. Nothing you wrote is lost — the first Bring across or
+Clear password on each old record carries it over.
 
 ### The message you owe them
 
@@ -118,6 +125,7 @@ Not a nice message to send. Much better than the alternative, and it is the hone
 | Anyone could read and write everything | `firestore.rules` + `storage.rules` |
 | No password reset | "Forgot your password" on the login screen |
 | No email verification | Sent on signup, with a reminder banner |
+| Your private notes sat on the player's own record, where he could read them | A separate `adminNotes` collection only admins can open |
 
-Records made before this change keep their old document id and are found through their `authUid`
-field, so nothing had to be moved or rewritten.
+No player data was moved or deleted to make any of this work. Old records stay exactly where they
+are; the admin button copies their contents onto the account the player creates.

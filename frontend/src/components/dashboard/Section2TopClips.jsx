@@ -21,7 +21,7 @@ const CATEGORIES = [
 
 const BLANK = { link: '', title: '', category: CATEGORIES[0], whyBest: '' };
 
-export function Section2TopClips({ adminMode, overrideData, adminDocId }) {
+export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
   const updateSection = adminMode ? null : context.updateSection;
@@ -134,7 +134,7 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId }) {
                 <AdminNoteField
                   docId={adminDocId}
                   noteKey={`topclip_${clip.id}`}
-                  initialValue={playerData.adminNotes?.perClip?.[`topclip_${clip.id}`] || ''}
+                  initialValue={adminNotes?.perClip?.[`topclip_${clip.id}`] || ''}
                 />
               )}
             </ItemRow>

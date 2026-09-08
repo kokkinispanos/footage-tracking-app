@@ -44,7 +44,7 @@ const KEY_FOR_POSITION = {
   'Striker': ['finishing', 'movement', 'aerial'],
 };
 
-export function Section3SkillClips({ adminMode, overrideData, adminDocId }) {
+export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
   const updateSection = adminMode ? null : context.updateSection;
@@ -179,7 +179,7 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId }) {
                         <AdminNoteField
                           docId={adminDocId}
                           noteKey={`skillclip_${clip.id}`}
-                          initialValue={playerData.adminNotes?.perClip?.[`skillclip_${clip.id}`] || ''}
+                          initialValue={adminNotes?.perClip?.[`skillclip_${clip.id}`] || ''}
                         />
                       )}
                     </ItemRow>
