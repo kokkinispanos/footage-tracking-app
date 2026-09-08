@@ -67,7 +67,7 @@ npm install
 npm test
 ```
 
-Starts the Firestore emulator (needs Java), runs `firestore.rules` against 46 cases and exits
+Starts the Firestore emulator (needs Java), runs `firestore.rules` against 47 cases and exits
 non-zero if any of them lets something through. **Run this before changing the rules and after.**
 The rules are the only thing standing between a signed-in player and everyone else's data; a
 comment saying they work is not evidence.

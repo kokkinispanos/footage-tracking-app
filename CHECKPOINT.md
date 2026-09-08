@@ -90,7 +90,7 @@ advice is scheduled, not ignored:
   passport — possession of one bypasses the rules; restrict filenames and object counts; treat
   the browser-reported MIME type as untrusted.
 - **Checkpoint 2:** rule tests on the Firebase emulator, which needs `firebase-tools` installed.
-  — DONE in checkpoint 2: `rules-tests/`, 46 tests, all passing.
+  — DONE in checkpoint 2: `rules-tests/`, 47 tests, all passing.
 - **Operational:** MFA on the admin account, and a retention/deletion policy once identity
   documents exist.
 
@@ -192,7 +192,7 @@ that were not there.
 - Fixed "8 of 23 pieces in" — a sentence that stopped mid-air, introduced in checkpoint 1.
 
 **Rule tests — the security is now proved, not asserted** (carried over from checkpoint 1's list)
-- `rules-tests/` runs `firestore.rules` against the Firestore emulator: **46 tests, all passing**.
+- `rules-tests/` runs `firestore.rules` against the Firestore emulator: **47 tests, all passing**.
   `npm test` in that folder starts the emulator itself. It needs Java, which is installed.
 - What they prove: a stranger reads and writes nothing; a player cannot read another record,
   list the collection, query for someone else, store a `password` or `role`, write coach notes,

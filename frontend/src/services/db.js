@@ -130,14 +130,17 @@ export const dbService = {
    * app rewrote the whole record for any edit, which is how a save on the phone could undo a
    * clip added on the laptop thirty seconds earlier.
    */
-  async updateProfileFields(docId, fields) {
+  async updateProfileFields(docId, fields, { touch = true } = {}) {
     const ALLOWED = ['fullName', 'position', 'email'];
     const patch = {};
     for (const key of ALLOWED) {
       if (fields?.[key] !== undefined) patch[`profile.${key}`] = fields[key];
     }
     if (Object.keys(patch).length === 0) return;
-    patch.updatedAt = serverTimestamp();
+    // `touch: false` for bookkeeping the player did not do — copying his new email across
+    // after he changed it in Firebase. Stamping `updatedAt` there would tell the admin list
+    // he added something, and the whole point of that column is that it is not guesswork.
+    if (touch) patch.updatedAt = serverTimestamp();
     await updateDoc(doc(db, 'players', docId), patch);
   },
 

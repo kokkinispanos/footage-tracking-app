@@ -136,6 +136,13 @@ await check('changes his own name and position', () =>
     updatedAt: serverTimestamp(),
   })));
 
+// The email-sync path writes profile.email ALONE, with no updatedAt, because copying his new
+// email across is not him adding something. A rule that required updatedAt would break it.
+await check('writes profile.email alone, with no updatedAt', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    'profile.email': 'moved@example.com',
+  })));
+
 await check('finds himself by authUid', () =>
   assertSucceeds(getDocs(query(collection(a, 'players'), where('authUid', '==', PLAYER_A)))));
 

@@ -114,12 +114,24 @@ export function PlayerProvider({ children }) {
   // 5. If he changed his sign-in email, the record catches up here.
   //    The change itself happens in Firebase when he clicks the link in the new inbox, so
   //    this is the first moment the app can know about it.
+  //
+  //    `data.profile` is a fresh object on every snapshot, so this effect runs on every
+  //    snapshot; the ref makes sure one mismatch produces one write attempt rather than one
+  //    per snapshot. `touch: false` because copying his email across is not him adding
+  //    something, and `updatedAt` is what the admin list reads as progress.
+  const emailSyncedRef = useRef(null);
   useEffect(() => {
     if (!docId || !user?.email || !data?.profile) return;
     const stored = (data.profile.email || '').trim().toLowerCase();
     const real = user.email.trim().toLowerCase();
     if (!real || stored === real) return;
-    dbService.updateProfileFields(docId, { email: real }).catch(() => {});
+
+    const attempt = `${docId}:${real}`;
+    if (emailSyncedRef.current === attempt) return;
+    emailSyncedRef.current = attempt;
+
+    dbService.updateProfileFields(docId, { email: real }, { touch: false })
+      .catch(() => { emailSyncedRef.current = null; });   // let a failed write try again
   }, [docId, user?.email, data?.profile]);
 
   /** Name, position or email. Returns nothing; the snapshot brings the new value back. */
