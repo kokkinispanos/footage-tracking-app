@@ -6,7 +6,7 @@ app is put together, then `MIGRATION.md` for what is waiting on Panos in the Fir
 
 ---
 
-## Checkpoint 1 — Security rebuilt (2026-09-09) ✅ CODE DONE, CONSOLE STEPS PENDING
+## Checkpoint 1 — Security rebuilt (2026-09-09) ✅ DONE, DEPLOYED, VERIFIED
 
 **What this stage was for:** the database was open to the internet. Anyone could read all six
 player records, passwords in plain text included. Nothing else could be built until that was gone.
@@ -98,6 +98,21 @@ advice is scheduled, not ignored:
 - Firebase Auth is confirmed **not yet enabled** on the project: the Identity Toolkit API answers
   `CONFIGURATION_NOT_FOUND`. That is step 1 of `MIGRATION.md`.
 - No account was created and no player data was moved during this work.
+
+### Deployed
+Merged to `main` and live at **https://footage-tracking-app.vercel.app** (2026-09-09). Verified on
+the live site: new sign-in renders, the `admin@admin.com` auto-fill button is gone, deep links
+route, no console errors. Firebase Auth is now ON (step 1 done). Email/password sign-in is NOT
+gated by the Firebase authorized-domains list, so the Vercel domain needs no entry there.
+
+**Rules published and verified closed (2026-09-09, 02:04).** An anonymous read of `players`,
+`admins` and `adminNotes` all answer `PERMISSION_DENIED`. Before publishing, `players` returned
+`200` with documents. The admin document is detected and the admin view loads.
+
+Note for whoever reads this later: a first attempt published a *different* set of rules (written by
+another assistant working in the Firebase console), which locked `/admins` but left `/players` open
+to the internet — the worst of both. The fix was to paste this repo's `firestore.rules` whole.
+Rules changes belong in this file and reach the console only as a paste of it.
 
 ### Waiting on Panos — `MIGRATION.md`
 1. Enable Email/Password sign-in.
