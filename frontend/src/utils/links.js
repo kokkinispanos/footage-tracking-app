@@ -1,8 +1,18 @@
 /** Link helpers. The app stores links, so a bad link is a bad record. */
 
+/**
+ * Everything here takes whatever it is given.
+ *
+ * `(raw || '').trim()` looks safe and is not: these run over stored records, and a record
+ * written before the rules checked types can hold anything. The case that caught this was a
+ * `photos` map saved as an ARRAY — then `item?.link` reads `String.prototype.link`, a legacy
+ * DOM method, and hands a *function* to the URL parser. Coercing first is the whole fix.
+ */
+const asString = (raw) => (typeof raw === 'string' ? raw : '');
+
 /** Add https:// when the player pastes "drive.google.com/..." without it. */
 export function normalizeUrl(raw) {
-  const value = (raw || '').trim();
+  const value = asString(raw).trim();
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
   if (/^[\w-]+(\.[\w-]+)+/.test(value)) return `https://${value}`;
@@ -38,6 +48,6 @@ export function linkWarning(raw) {
 
 /** A short, readable version of a long URL for display. */
 export function prettyUrl(raw, max = 52) {
-  const value = (raw || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+  const value = asString(raw).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
