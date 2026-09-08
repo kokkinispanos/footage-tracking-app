@@ -31,7 +31,7 @@ export function ProgressPanel({ stats }) {
             </div>
           </div>
           <div className="text-sm text-ink-muted text-right">
-            <span className="text-ink font-medium tabular-nums">{stats.done}</span> of {stats.total} pieces in
+            <span className="text-ink font-medium tabular-nums">{stats.done}</span> of {stats.total} pieces in place
           </div>
         </div>
 

@@ -97,6 +97,37 @@ export function PlayerProvider({ children }) {
     return () => window.removeEventListener('pagehide', flush);
   }, [docId]);
 
+  // 4. Stamp that he opened it, at most once an hour.
+  //    This is what makes "who has gone quiet?" answerable on the admin side. It is thrown
+  //    away silently on failure: a player must never see an error for a bookkeeping write.
+  useEffect(() => {
+    if (!docId) return;
+    const key = `pph:lastSeen:${docId}`;
+    let previous = 0;
+    try { previous = Number(localStorage.getItem(key)) || 0; } catch { previous = 0; }
+    if (Date.now() - previous < 3600000) return;
+    dbService.touchLastSeen(docId)
+      .then(() => { try { localStorage.setItem(key, String(Date.now())); } catch { /* private window */ } })
+      .catch(() => {});
+  }, [docId]);
+
+  // 5. If he changed his sign-in email, the record catches up here.
+  //    The change itself happens in Firebase when he clicks the link in the new inbox, so
+  //    this is the first moment the app can know about it.
+  useEffect(() => {
+    if (!docId || !user?.email || !data?.profile) return;
+    const stored = (data.profile.email || '').trim().toLowerCase();
+    const real = user.email.trim().toLowerCase();
+    if (!real || stored === real) return;
+    dbService.updateProfileFields(docId, { email: real }).catch(() => {});
+  }, [docId, user?.email, data?.profile]);
+
+  /** Name, position or email. Returns nothing; the snapshot brings the new value back. */
+  const saveProfile = useCallback(async (fields) => {
+    if (!docId) return;
+    await dbService.updateProfileFields(docId, fields);
+  }, [docId]);
+
   /**
    * Change one section of the record.
    * `sectionKey` is a top-level field the player owns; `updaterFn` receives that section only.
@@ -146,6 +177,7 @@ export function PlayerProvider({ children }) {
       notFound,
       saveStatus,
       updateSection,
+      saveProfile,
     }}>
       {children}
     </PlayerContext.Provider>

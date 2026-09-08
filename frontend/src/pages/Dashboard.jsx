@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { MailWarning, LifeBuoy } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { MailWarning, LifeBuoy, Download, CloudOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { calculateCompletion } from '../utils/completion';
 import { AppHeader } from '../components/ui/AppHeader';
 import { Splash } from '../components/ui/Splash';
 import { Button } from '../components/ui/Button';
 import { GlassCard } from '../components/ui/GlassCard';
 import { ProgressPanel } from '../components/dashboard/ProgressPanel';
+import { NextStep } from '../components/dashboard/NextStep';
+import { SectionNav } from '../components/dashboard/SectionNav';
 
 import { Section1FullGames } from '../components/dashboard/Section1FullGames';
 import { Section2TopClips } from '../components/dashboard/Section2TopClips';
@@ -41,7 +45,14 @@ function AwaitingRecord({ email, onLogout }) {
 export function Dashboard() {
   const { user, logout, resendVerification } = useAuth();
   const { playerData, loading, notFound, saveStatus } = usePlayer();
+  const online = useOnlineStatus();
   const [verificationSent, setVerificationSent] = useState(false);
+
+  // `scroll-mt-24` on each anchor keeps the sticky header from covering the heading.
+  const goTo = useCallback((anchor) => {
+    if (!anchor) return;
+    document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   if (loading) return <Splash label="Opening your hub…" />;
   if (notFound || !playerData) {
@@ -59,15 +70,26 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-dvh pb-20">
+    <div className="min-h-dvh pb-28 sm:pb-20">
       <AppHeader
         subtitle="Player Hub"
         saveStatus={saveStatus}
         userName={playerData.profile?.fullName}
         onLogout={logout}
+        accountLink
       />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-7 sm:pt-9 space-y-6">
+        {!online && (
+          <div className="flex items-start gap-3 bg-warning/[0.08] border border-warning/25 rounded-2xl px-4 py-3.5 animate-fadeIn">
+            <CloudOff className="w-5 h-5 text-warning flex-none mt-0.5" />
+            <p className="text-sm text-ink-muted leading-relaxed">
+              You are offline. Keep going — everything you add is saved on this device and sent
+              to us the moment you have signal again. Do not clear your browser data until then.
+            </p>
+          </div>
+        )}
+
         {user && !user.emailVerified && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-warning/[0.08] border border-warning/25 rounded-2xl px-4 py-3.5 animate-fadeIn">
             <MailWarning className="w-5 h-5 text-warning flex-none" />
@@ -92,16 +114,29 @@ export function Dashboard() {
             Everything a club needs to see about you lives here.
           </p>
           <ProgressPanel stats={stats} />
+
+          <div className="mt-2.5 flex justify-end">
+            <Link
+              to="/account"
+              className="inline-flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink-muted transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" /> Download everything you have added
+            </Link>
+          </div>
         </section>
 
+        <NextStep playerData={playerData} onGo={goTo} />
+
         <div className="space-y-5">
-          <Section1FullGames />
-          <Section2TopClips />
-          <Section3SkillClips />
-          <Section4Photos />
-          <Section5Drive />
+          <div id="full-games" className="scroll-mt-24"><Section1FullGames /></div>
+          <div id="top-clips" className="scroll-mt-24"><Section2TopClips /></div>
+          <div id="skill-clips" className="scroll-mt-24"><Section3SkillClips /></div>
+          <div id="photos" className="scroll-mt-24"><Section4Photos /></div>
+          <div id="drive-folder" className="scroll-mt-24"><Section5Drive /></div>
         </div>
       </main>
+
+      <SectionNav stats={stats} onGo={goTo} />
     </div>
   );
 }

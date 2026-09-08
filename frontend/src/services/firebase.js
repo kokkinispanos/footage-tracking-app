@@ -1,7 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage";
 
 // This config is PUBLIC by design — it ships inside the JavaScript bundle and always has.
 // It is an address, not a key: it tells the browser which Firebase project to talk to.
@@ -20,6 +23,32 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+/**
+ * Firestore, with an on-device cache.
+ *
+ * Why this and not `getFirestore(app)`: a player films at a ground on bad wifi. Without a
+ * cache, a paste that fails to reach the server is simply lost and he has no idea. With it,
+ * Firestore writes to IndexedDB first, tells the app it succeeded, and sends it when the
+ * connection returns — even if he closes the tab and comes back tomorrow.
+ *
+ * `persistentMultipleTabManager` because he will have the hub open on his phone and his
+ * laptop, and two tabs sharing one cache must not fight over it.
+ *
+ * If the browser refuses the cache (private windows, an old browser, storage turned off)
+ * Firebase falls back to memory on its own. Nothing here throws; the app just goes back to
+ * needing a connection, which is where it was before.
+ */
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
+
 export const auth = getAuth(app);
-export const storage = getStorage(app);
+
+/**
+ * Storage is deliberately NOT initialised here yet.
+ *
+ * Nothing uploads a file until the hub sections land, and importing `firebase/storage`
+ * costs every player a chunk of download on a phone for a feature that does not exist.
+ * `storage.rules` is already written and published; when the first upload screen is built,
+ * add `getStorage(app)` back — ideally behind a dynamic import in that screen alone.
+ */

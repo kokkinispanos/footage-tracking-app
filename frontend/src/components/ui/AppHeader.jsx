@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { CheckCircle2, LogOut, Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, LogOut, Loader2, AlertTriangle, ChevronDown, Settings, CloudOff } from 'lucide-react';
 import { Wordmark } from './Brand';
 import { Button } from './Button';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { cn } from '../../utils/cn';
 
-function SaveIndicator({ status }) {
+function SaveIndicator({ status, online }) {
+  if (!online) {
+    return (
+      <span className="flex items-center gap-1.5 text-[11px] text-warning bg-warning/10 border border-warning/25 px-2.5 py-1 rounded-full">
+        <CloudOff className="w-3 h-3" /> Offline — saved on this device
+      </span>
+    );
+  }
   if (status === 'saving') {
     return (
       <span className="flex items-center gap-1.5 text-[11px] text-brand-light bg-brand/10 border border-brand/20 px-2.5 py-1 rounded-full">
@@ -29,19 +38,20 @@ function SaveIndicator({ status }) {
   return null;
 }
 
-export function AppHeader({ subtitle, saveStatus, userName, onLogout, right }) {
+export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, accountLink = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const online = useOnlineStatus();
 
   return (
     <header className="sticky top-0 z-50 bg-background/85 backdrop-blur-xl border-b border-white/[0.07]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Wordmark sub={subtitle} />
-          <div className="hidden sm:block"><SaveIndicator status={saveStatus} /></div>
+          <div className="hidden sm:block"><SaveIndicator status={saveStatus} online={online} /></div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="sm:hidden"><SaveIndicator status={saveStatus} /></div>
+          <div className="sm:hidden"><SaveIndicator status={saveStatus} online={online} /></div>
           {right}
 
           {userName && (
@@ -67,6 +77,16 @@ export function AppHeader({ subtitle, saveStatus, userName, onLogout, right }) {
                     <div className="px-3 py-2 text-xs text-ink-faint border-b border-white/[0.07] mb-1 truncate">
                       {userName}
                     </div>
+                    {accountLink && (
+                      <Link
+                        to="/account"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[13px]
+                                   text-ink-muted hover:text-ink hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Settings className="w-4 h-4" /> Your account
+                      </Link>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

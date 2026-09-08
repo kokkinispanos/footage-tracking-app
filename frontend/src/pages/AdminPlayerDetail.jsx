@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Check, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Download, Check, AlertTriangle, FileText, Copy, Pencil, Clock } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { calculateCompletion } from '../utils/completion';
+import { describeActivity, humanAge, fullDate, lastSavedMs, lastSeenMs } from '../utils/activity';
+import { downloadLinkSheet, downloadRawJson, copyLinkSheet } from '../utils/export';
+import { POSITIONS } from '../utils/catalog';
+import { Input } from '../components/ui/Input';
 import { AppHeader } from '../components/ui/AppHeader';
 import { GlassCard } from '../components/ui/GlassCard';
 import { Button } from '../components/ui/Button';
@@ -27,6 +31,10 @@ export function AdminPlayerDetail() {
   const [loading, setLoading] = useState(true);
   const [generalNote, setGeneralNote] = useState('');
   const [noteStatus, setNoteStatus] = useState('idle');
+  const [editing, setEditing] = useState(null);      // { fullName, position } while open
+  const [editStatus, setEditStatus] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [copied, setCopied] = useState(false);
   const timerRef = useRef(null);
 
   // The record and the notes are two separate documents on purpose: notes live in an
@@ -62,20 +70,41 @@ export function AdminPlayerDetail() {
     }, 800);
   }, [id]);
 
-  const exportJson = useCallback(() => {
+  const copySheet = useCallback(async () => {
     if (!playerData) return;
-    // Never hand the admin a file with a leftover password in it.
-    const { password, ...safe } = playerData;
-    const blob = new Blob([JSON.stringify(safe, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(playerData.profile?.fullName || 'player').replace(/\s+/g, '_')}_hub.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    try {
+      await copyLinkSheet(playerData);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch { /* clipboard refused; the downloads still work */ }
   }, [playerData]);
+
+  /**
+   * Fix a name or a position on the player's behalf.
+   *
+   * NOT the email: that is his Firebase Auth identity, and changing the copy on the record
+   * would only make the two disagree. He changes it himself from his account page, which
+   * sends a confirmation link to the new address.
+   */
+  const saveEdit = useCallback(async () => {
+    if (!editing) return;
+    if (!editing.fullName.trim()) { setEditStatus('A name cannot be empty.'); return; }
+    setSavingEdit(true);
+    setEditStatus('');
+    try {
+      await dbService.updateProfileFields(id, {
+        fullName: editing.fullName.trim(),
+        position: editing.position,
+      });
+      const fresh = await dbService.getPlayerById(id);
+      setPlayerData(fresh);
+      setEditing(null);
+    } catch (e) {
+      setEditStatus(e?.message || 'Could not save that.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editing, id]);
 
   if (loading) return <Splash label="Loading player…" />;
 
@@ -92,6 +121,9 @@ export function AdminPlayerDetail() {
   }
 
   const stats = calculateCompletion(playerData);
+  const activity = describeActivity(playerData);
+  const savedMs = lastSavedMs(playerData);
+  const seenMs = lastSeenMs(playerData);
   const shared = { adminMode: true, overrideData: playerData, adminDocId: id, adminNotes };
 
   return (
@@ -101,9 +133,9 @@ export function AdminPlayerDetail() {
         userName={user?.displayName || user?.email}
         onLogout={logout}
         right={
-          <Button variant="ghost" size="sm" onClick={exportJson} className="gap-1.5">
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Export</span>
+          <Button variant="ghost" size="sm" onClick={() => downloadLinkSheet(playerData)} className="gap-1.5">
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">Link sheet</span>
           </Button>
         }
       />
@@ -123,12 +155,83 @@ export function AdminPlayerDetail() {
             </h1>
             {playerData.profile?.position && <StatusPill tone="brand">{playerData.profile.position}</StatusPill>}
             {!playerData.authUid && <StatusPill tone="warning">Old record, not linked</StatusPill>}
+            <StatusPill tone={activity.tone}>
+              <Clock className="w-3 h-3" /> {activity.label}
+            </StatusPill>
+            <button
+              onClick={() => setEditing({
+                fullName: playerData.profile?.fullName || '',
+                position: playerData.profile?.position || POSITIONS[0],
+              })}
+              className="inline-flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Fix name or position
+            </button>
           </div>
-          <p className="text-sm text-ink-muted mb-6">
+
+          <p className="text-sm text-ink-muted mb-4">
             {playerData.profile?.email}
             {playerData.profile?.createdAt && ` · joined ${playerData.profile.createdAt.slice(0, 10)}`}
           </p>
+
+          {/* Two different facts: did he ADD anything, and did he even LOOK. */}
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-faint mb-6">
+            <span>Last added something: <span className="text-ink-muted">{savedMs ? humanAge(savedMs) : 'never'}</span></span>
+            <span>Last opened the hub: <span className="text-ink-muted">{seenMs ? humanAge(seenMs) : 'not since we started recording'}</span></span>
+            {savedMs > 0 && <span className="hidden sm:inline">{fullDate(savedMs)}</span>}
+          </div>
+
+          {editing && (
+            <GlassCard className="mb-6 space-y-4 border-brand/25">
+              <h3 className="font-semibold text-ink text-sm">Fix this player's details</h3>
+              <Input
+                label="Full name"
+                value={editing.fullName}
+                onChange={(e) => setEditing({ ...editing, fullName: e.target.value })}
+              />
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="admin-position" className="text-[13px] font-medium text-ink-muted">
+                  Main position
+                </label>
+                <select
+                  id="admin-position"
+                  value={editing.position}
+                  onChange={(e) => setEditing({ ...editing, position: e.target.value })}
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink
+                             focus:outline-none focus:ring-2 focus:ring-brand/40"
+                >
+                  {POSITIONS.map((pos) => (
+                    <option key={pos} value={pos} className="bg-elevated">{pos}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-ink-faint">
+                His email is not editable here — it is his sign-in identity, and changing the copy
+                on this record would only make the two disagree. He changes it from his own account
+                page, which sends a confirmation link to the new address.
+              </p>
+              {editStatus && <p className="text-[13px] text-error">{editStatus}</p>}
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
+                <Button variant="ghost" onClick={() => { setEditing(null); setEditStatus(''); }}>Cancel</Button>
+                <Button onClick={saveEdit} loading={savingEdit}>Save</Button>
+              </div>
+            </GlassCard>
+          )}
+
           <ProgressPanel stats={stats} />
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => downloadLinkSheet(playerData)} className="gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Link sheet for the editor
+            </Button>
+            <Button variant="ghost" size="sm" onClick={copySheet} className="gap-1.5">
+              {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied' : 'Copy it'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => downloadRawJson(playerData)} className="gap-1.5">
+              <Download className="w-3.5 h-3.5" /> Raw data
+            </Button>
+          </div>
         </section>
 
         <GlassCard className="space-y-3">

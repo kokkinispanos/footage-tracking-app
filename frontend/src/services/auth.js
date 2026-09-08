@@ -6,6 +6,10 @@ import {
   sendEmailVerification,
   onAuthStateChanged,
   updateProfile,
+  updatePassword,
+  verifyBeforeUpdateEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -51,6 +55,10 @@ export function readableAuthError(err) {
       return 'Something went wrong at our end. Please try again in a moment.';
     case 'auth/requires-recent-login':
       return 'For your security, please sign in again before making that change.';
+    case 'auth/invalid-login-credentials':
+      return 'That password is not right.';
+    case 'auth/unverified-email':
+      return 'Confirm your current email address first — the link is in your inbox.';
     default:
       // Never show a player a raw error code.
       return 'Something went wrong. Please try again, or contact Pro Placement if it keeps happening.';
@@ -102,6 +110,47 @@ export const authService = {
     } catch {
       return false;
     }
+  },
+
+  // ------------------------------------------------------- changing the account
+
+  /**
+   * Firebase refuses to change an email or a password on a session that has been sitting
+   * open for hours, which is correct: a walk-past at a laptop should not be able to take
+   * an account over. The player types his current password and we prove it here first.
+   */
+  async reauthenticate(currentPassword) {
+    const user = auth.currentUser;
+    if (!user?.email) throw Object.assign(new Error('not signed in'), { code: 'auth/null-user' });
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  },
+
+  /** The display name on the Auth account. The record's `profile.fullName` is written separately. */
+  async setDisplayName(fullName) {
+    if (!auth.currentUser) return;
+    await updateProfile(auth.currentUser, { displayName: (fullName || '').trim() });
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    await this.reauthenticate(currentPassword);
+    await updatePassword(auth.currentUser, newPassword);
+  },
+
+  /**
+   * Change the sign-in email.
+   *
+   * `verifyBeforeUpdateEmail`, not `updateEmail`: the link goes to the NEW address and the
+   * change only happens when he clicks it. So a typo cannot lock him out of his own account,
+   * and nobody can move an account to an address they do not control. It is also the only
+   * one of the two that still works with email-enumeration protection switched on.
+   *
+   * The record's `profile.email` is deliberately NOT changed here — it catches up by itself
+   * on his next sign-in (see PlayerContext), once the change has actually happened.
+   */
+  async changeEmail(currentPassword, newEmail) {
+    await this.reauthenticate(currentPassword);
+    await verifyBeforeUpdateEmail(auth.currentUser, newEmail.trim());
   },
 
   subscribe(callback) {

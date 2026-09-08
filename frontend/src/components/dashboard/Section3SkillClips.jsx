@@ -12,37 +12,7 @@ import { AdminNoteField } from './AdminNoteField';
 import { normalizeUrl, linkWarning } from '../../utils/links';
 import { TARGETS, countSkillClips } from '../../utils/completion';
 import { cn } from '../../utils/cn';
-
-const FIELD_CATEGORIES = [
-  { key: 'passing', label: 'Passing & vision' },
-  { key: 'dribbling', label: 'Dribbling & 1v1 attacking' },
-  { key: 'defending', label: 'Defending & 1v1 defensive' },
-  { key: 'finishing', label: 'Finishing / ball striking' },
-  { key: 'movement', label: 'Movement off the ball' },
-  { key: 'pressing', label: 'Pressing & hustle' },
-  { key: 'aerial', label: 'Aerial duels' },
-  { key: 'other', label: 'Other skills' },
-];
-
-const GK_CATEGORIES = [
-  { key: 'saves', label: 'Shot stopping / saves' },
-  { key: 'distribution', label: 'Distribution (hands & feet)' },
-  { key: 'commandingTheBox', label: 'Commanding the box / crosses' },
-  { key: '1v1Situations', label: '1v1 situations / sweeping' },
-  { key: 'organizingDefense', label: 'Communication / organising' },
-];
-
-/** Which categories matter most for this position, so a player knows where to double down. */
-const KEY_FOR_POSITION = {
-  'Goalkeeper': ['saves', 'distribution', 'commandingTheBox'],
-  'Center Back': ['defending', 'aerial', 'passing'],
-  'Full Back / Wing Back': ['defending', 'dribbling', 'movement'],
-  'Defensive Midfielder': ['defending', 'passing', 'pressing'],
-  'Central Midfielder': ['passing', 'movement', 'dribbling'],
-  'Attacking Midfielder': ['passing', 'dribbling', 'finishing'],
-  'Winger': ['dribbling', 'finishing', 'movement'],
-  'Striker': ['finishing', 'movement', 'aerial'],
-};
+import { FIELD_CATEGORIES, GK_CATEGORIES, KEY_FOR_POSITION, isGoalkeeper } from '../../utils/catalog';
 
 export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
@@ -57,7 +27,7 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
   const { confirm, dialog } = useConfirm();
 
   const position = playerData?.profile?.position || '';
-  const isGK = position.toLowerCase().includes('goalkeeper');
+  const isGK = isGoalkeeper(position);
   const categories = isGK ? GK_CATEGORIES : FIELD_CATEGORIES;
   const keyCats = KEY_FOR_POSITION[position] || [];
   const clips = playerData?.skillClips || {};

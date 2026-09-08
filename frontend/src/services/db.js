@@ -123,6 +123,38 @@ export const dbService = {
     await updateDoc(doc(db, 'players', docId), clean);
   },
 
+  /**
+   * Change one of the three facts on the profile: name, position, email.
+   *
+   * Written as dotted field paths so a name change touches `profile.fullName` alone. The old
+   * app rewrote the whole record for any edit, which is how a save on the phone could undo a
+   * clip added on the laptop thirty seconds earlier.
+   */
+  async updateProfileFields(docId, fields) {
+    const ALLOWED = ['fullName', 'position', 'email'];
+    const patch = {};
+    for (const key of ALLOWED) {
+      if (fields?.[key] !== undefined) patch[`profile.${key}`] = fields[key];
+    }
+    if (Object.keys(patch).length === 0) return;
+    patch.updatedAt = serverTimestamp();
+    await updateDoc(doc(db, 'players', docId), patch);
+  },
+
+  /**
+   * Stamp that he opened the hub. Deliberately does NOT touch `updatedAt`.
+   *
+   * The two are different facts and the admin list shows both: `updatedAt` says he added
+   * something, `lastSeenAt` says he looked. A player who signs in every day and adds nothing
+   * has seen the gaps and chosen to leave them, which is worth knowing and would be invisible
+   * if opening the app counted as progress.
+   */
+  async touchLastSeen(docId) {
+    await updateDoc(doc(db, 'players', docId), {
+      'profile.lastSeenAt': new Date().toISOString(),
+    });
+  },
+
   // ---------------------------------------------------------------- admin only
 
   async getAllPlayers() {

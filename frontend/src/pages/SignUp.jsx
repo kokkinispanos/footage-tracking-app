@@ -7,17 +7,7 @@ import { AuthLayout } from '../components/ui/AuthLayout';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { cn } from '../utils/cn';
-
-export const POSITIONS = [
-  "Goalkeeper",
-  "Center Back",
-  "Full Back / Wing Back",
-  "Defensive Midfielder",
-  "Central Midfielder",
-  "Attacking Midfielder",
-  "Winger",
-  "Striker",
-];
+import { POSITIONS } from '../utils/catalog';
 
 const MIN_PASSWORD = 8;
 

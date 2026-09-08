@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, RefreshCw, ShieldAlert, Link2, Users } from 'lucide-react';
+import { Search, ArrowRight, RefreshCw, ShieldAlert, Link2, Users, Clock } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { calculateCompletion, createdAtMs } from '../utils/completion';
+import { describeActivity, lastActiveMs } from '../utils/activity';
 import { AppHeader } from '../components/ui/AppHeader';
 import { GlassCard } from '../components/ui/GlassCard';
 import { Input } from '../components/ui/Input';
@@ -159,18 +160,29 @@ export function AdminOverview() {
   const legacy = useMemo(() => players.filter((p) => !p.authUid && !p.mergedInto), [players]);
 
   const rows = useMemo(() => {
-    const enriched = active.map((p) => ({ ...p, stats: calculateCompletion(p) }));
+    const enriched = active.map((p) => ({
+      ...p,
+      stats: calculateCompletion(p),
+      activity: describeActivity(p),
+    }));
     return enriched
       .filter((p) => !search || (p.profile?.fullName || '').toLowerCase().includes(search.toLowerCase())
                              || (p.profile?.email || '').toLowerCase().includes(search.toLowerCase()))
       .filter((p) => !positionFilter || p.profile?.position === positionFilter)
       .sort((a, b) => {
+        if (sortBy === 'quietest') return lastActiveMs(a) - lastActiveMs(b);
         if (sortBy === 'newest') return createdAtMs(b) - createdAtMs(a);
         if (sortBy === 'az') return (a.profile?.fullName || '').localeCompare(b.profile?.fullName || '');
         if (sortBy === 'most_complete') return b.stats.percent - a.stats.percent;
         return a.stats.percent - b.stats.percent;   // least complete first: who needs chasing
       });
   }, [active, search, positionFilter, sortBy]);
+
+  // "Quiet" is 14 days with no sign of life. Worth a message, not yet a problem.
+  const quietCount = useMemo(
+    () => active.filter((p) => describeActivity(p).quiet).length,
+    [active]
+  );
 
   const positions = useMemo(
     () => [...new Set(active.map((p) => p.profile?.position).filter(Boolean))].sort(),
@@ -197,6 +209,11 @@ export function AdminOverview() {
         <div className="flex flex-wrap items-baseline gap-3">
           <h1 className="text-2xl sm:text-3xl font-semibold">Players</h1>
           <StatusPill tone="brand">{active.length} registered</StatusPill>
+          {quietCount > 0 && (
+            <StatusPill tone="warning">
+              <Clock className="w-3 h-3" /> {quietCount} quiet for 2 weeks+
+            </StatusPill>
+          )}
         </div>
 
         {error && (
@@ -230,6 +247,7 @@ export function AdminOverview() {
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
             >
               <option value="least_complete" className="bg-elevated">Needs chasing first</option>
+              <option value="quietest" className="bg-elevated">Quietest first</option>
               <option value="most_complete" className="bg-elevated">Most complete first</option>
               <option value="newest" className="bg-elevated">Newest first</option>
               <option value="az" className="bg-elevated">A to Z</option>
@@ -267,7 +285,18 @@ export function AdminOverview() {
                           <StatusPill>{player.profile.position}</StatusPill>
                         )}
                       </div>
-                      <div className="text-xs text-ink-faint truncate mt-1">{player.profile?.email}</div>
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="text-xs text-ink-faint truncate">{player.profile?.email}</span>
+                        <span className={cn(
+                          'text-xs flex-none',
+                          player.activity.tone === 'error' && 'text-error',
+                          player.activity.tone === 'warning' && 'text-warning',
+                          player.activity.tone === 'success' && 'text-success',
+                          player.activity.tone === 'neutral' && 'text-ink-faint',
+                        )}>
+                          · {player.activity.label}
+                        </span>
+                      </div>
 
                       <div className="flex items-center gap-2.5 mt-2.5">
                         <div className="h-1.5 flex-1 max-w-[13rem] bg-black/40 rounded-full overflow-hidden">

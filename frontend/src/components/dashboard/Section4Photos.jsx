@@ -8,15 +8,7 @@ import { AdminNoteField } from './AdminNoteField';
 import { normalizeUrl, linkWarning, prettyUrl } from '../../utils/links';
 import { TARGETS, countPhotos } from '../../utils/completion';
 import { cn } from '../../utils/cn';
-
-const PHOTO_TYPES = [
-  { key: 'cleanKit', label: 'Clean kit & boots', desc: 'Full body, standing straight, professional look.' },
-  { key: 'actionShot', label: 'Action shot', desc: 'In a game, showing intensity.' },
-  { key: 'training', label: 'Training', desc: 'At training, on the ball or with a coach.' },
-  { key: 'headshot', label: 'Headshot', desc: 'Confident, good light, face clearly visible.' },
-  { key: 'teamPhoto', label: 'Team photo', desc: 'Starting XI. Tell us which one is you.' },
-  { key: 'lifestyle', label: 'Lifestyle', desc: 'Off the pitch, still professional.' },
-];
+import { PHOTO_TYPES } from '../../utils/catalog';
 
 export function Section4Photos({ adminMode, overrideData, adminDocId, adminNotes }) {
   const context = usePlayer();
