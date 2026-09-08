@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import {
   initializeFirestore,
+  getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
@@ -38,9 +39,57 @@ const app = initializeApp(firebaseConfig);
  * Firebase falls back to memory on its own. Nothing here throws; the app just goes back to
  * needing a connection, which is where it was before.
  */
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-});
+function openFirestore() {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    // Already initialised. In production this module is evaluated once and we never get
+    // here; in development Vite re-evaluates it on every hot reload, and without this the
+    // whole app throws `failed-precondition` until you reload the page by hand.
+    return getFirestore(app);
+  }
+}
+
+export const db = openFirestore();
+
+/**
+ * Did the on-device cache actually start?
+ *
+ * `initializeFirestore` never tells you. If IndexedDB is unavailable — a private window, an
+ * old browser, site data blocked — Firebase quietly falls back to a memory cache, and then a
+ * write made while offline lives only until the tab closes. The app was telling the player
+ * "saved on this device" either way, which is the one lie that costs him his work.
+ *
+ * So we ask IndexedDB directly. A refusal here means the fallback definitely happened; a
+ * success means it almost certainly did not.
+ */
+export const offlineStorageAvailable = (async () => {
+  const NAME = 'pph-storage-probe';
+  try {
+    if (typeof indexedDB === 'undefined') return false;
+    return await new Promise((resolve) => {
+      let request;
+      try {
+        request = indexedDB.open(NAME);
+      } catch {
+        resolve(false);
+        return;
+      }
+      request.onerror = () => resolve(false);
+      request.onblocked = () => resolve(true);
+      request.onsuccess = () => {
+        try { request.result.close(); indexedDB.deleteDatabase(NAME); } catch { /* fine */ }
+        resolve(true);
+      };
+      // Safari in some private modes never fires either handler.
+      setTimeout(() => resolve(false), 3000);
+    });
+  } catch {
+    return false;
+  }
+})();
 
 export const auth = getAuth(app);
 

@@ -1,6 +1,6 @@
 import { db } from './firebase';
 import {
-  collection, doc, setDoc, getDoc, getDocs, updateDoc,
+  collection, doc, setDoc, getDoc, getDocs, updateDoc, onSnapshot,
   query, where, deleteField, FieldPath, serverTimestamp,
 } from 'firebase/firestore';
 
@@ -145,6 +145,24 @@ export const dbService = {
   },
 
   /**
+   * Record the address Firebase says he has proved he owns.
+   *
+   * This is the field the coach matches an old record against. It is not `profile.email`,
+   * because he writes that one himself — he could type a team-mate's address into it and
+   * wait for "Bring across" to hand him that team-mate's footage. The rules only accept
+   * this write when it equals the signed-in address AND Firebase says it is verified, so
+   * an attacker holding an account on someone else's address still cannot set it.
+   *
+   * Called on load once he has clicked the link in his inbox. Silent on failure: the rules
+   * refuse it while he is unverified, which is the normal state for a new player.
+   */
+  async claimVerifiedEmail(docId, email) {
+    await updateDoc(doc(db, 'players', docId), {
+      authEmail: (email || '').trim().toLowerCase(),
+    });
+  },
+
+  /**
    * Stamp that he opened the hub. Deliberately does NOT touch `updatedAt`.
    *
    * The two are different facts and the admin list shows both: `updatedAt` says he added
@@ -153,8 +171,10 @@ export const dbService = {
    * if opening the app counted as progress.
    */
   async touchLastSeen(docId) {
+    // The SERVER's clock, not the phone's. A device set a year ahead used to make the
+    // coach's "who has gone quiet" list wrong until that date arrived.
     await updateDoc(doc(db, 'players', docId), {
-      'profile.lastSeenAt': new Date().toISOString(),
+      'profile.lastSeenAt': serverTimestamp(),
     });
   },
 
@@ -163,6 +183,29 @@ export const dbService = {
   async getAllPlayers() {
     const qs = await getDocs(collection(db, 'players'));
     return qs.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+
+  /**
+   * Watch one player, for the admin.
+   *
+   * It used to read once. The coach opens a player WHILE talking to him, asks for two more
+   * clips, the player adds them, and the coach's screen still says what it said five minutes
+   * ago — so he asks again. Returns an unsubscribe function.
+   */
+  watchPlayer(docId, onChange) {
+    return onSnapshot(
+      doc(db, 'players', docId),
+      (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      () => { /* a dropped listener leaves the last value on screen, which is the right failure */ },
+    );
+  },
+
+  watchAdminNotes(docId, onChange) {
+    return onSnapshot(
+      doc(db, 'adminNotes', docId),
+      (snap) => onChange(snap.exists() ? snap.data() : { general: '', perClip: {} }),
+      () => {},
+    );
   },
 
   async getPlayerById(docId) {

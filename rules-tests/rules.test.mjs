@@ -92,6 +92,17 @@ const b = testEnv.authenticatedContext(PLAYER_B).firestore();
 const admin = testEnv.authenticatedContext(ADMIN).firestore();
 const fresh = testEnv.authenticatedContext(FRESH).firestore();
 
+// The same player, with and without having clicked the link in his inbox. `authEmail` is
+// the field the coach matches an old record against, so who may write it is the whole
+// difference between a working migration and handing one player another player's footage.
+const A_EMAIL = 'playera@example.com';
+const verifiedA = testEnv
+  .authenticatedContext(PLAYER_A, { email: A_EMAIL, email_verified: true })
+  .firestore();
+const unverifiedA = testEnv
+  .authenticatedContext(PLAYER_A, { email: A_EMAIL, email_verified: false })
+  .firestore();
+
 // ============================================================ a stranger
 section('A stranger, signed into nothing');
 
@@ -202,6 +213,62 @@ await check('cannot reach the legacy record with the plaintext password', () =>
 
 await check('another player cannot read the first one either', () =>
   assertFails(getDoc(doc(b, 'players', PLAYER_A))));
+
+// ================================================ the verified-email claim
+section('Claiming a verified email — the field the migration matches on');
+
+await check('an UNVERIFIED player cannot claim his own address', () =>
+  assertFails(updateDoc(doc(unverifiedA, 'players', PLAYER_A), { authEmail: A_EMAIL })));
+
+await check('a verified player CAN claim his own address', () =>
+  assertSucceeds(updateDoc(doc(verifiedA, 'players', PLAYER_A), { authEmail: A_EMAIL })));
+
+await check('a verified player cannot claim someone else address', () =>
+  assertFails(updateDoc(doc(verifiedA, 'players', PLAYER_A), {
+    authEmail: 'victim@example.com',
+  })));
+
+await check('a player with no email claim at all cannot set it', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { authEmail: 'anything@example.com' })));
+
+await check('a player cannot rewrite his claim to a team-mate address later', () =>
+  assertFails(updateDoc(doc(verifiedA, 'players', PLAYER_A), {
+    authEmail: 'someone.else@example.com',
+  })));
+
+await check('the coach can still edit a record that carries a claim', () =>
+  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
+    'profile.position': 'Center Back', updatedAt: serverTimestamp(),
+  })));
+
+await check('the coach cannot change a claim', () =>
+  assertFails(updateDoc(doc(admin, 'players', PLAYER_A), { authEmail: 'coach@example.com' })));
+
+await check('the player can still save his footage with a claim in place', () =>
+  assertSucceeds(updateDoc(doc(verifiedA, 'players', PLAYER_A), {
+    topThreeClips: [{ id: 'c1', link: 'https://youtu.be/x' }],
+    updatedAt: serverTimestamp(),
+  })));
+
+// ================================================ the shape of a record
+section('The shape of a record — a player cannot break the coach dashboard');
+
+await check('a name must be text, not a map', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { 'profile.fullName': { evil: true } })));
+
+await check('a position must be text', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { 'profile.position': 42 })));
+
+await check('full games must be a list', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { fullGames: 'not a list' })));
+
+await check('photos must be a map', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { photos: ['nope'] })));
+
+await check('a properly shaped write still goes through', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    'profile.fullName': 'A Real Name', updatedAt: serverTimestamp(),
+  })));
 
 // ============================================================ signing up
 section('A brand-new account creating its record');

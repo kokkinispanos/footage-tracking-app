@@ -12,17 +12,30 @@
  * has vanished, and the admin list shows which is which.
  */
 
+/**
+ * A timestamp in the future is a broken clock, not a visit from tomorrow.
+ *
+ * `lastSeenAt` is a server timestamp now, but records written before that change hold an ISO
+ * string from the player's own device — and a phone set a year ahead would have shown him as
+ * "active just now" on the coach's list until that date actually arrived. Clamping to now
+ * makes the wrong answer boring instead of misleading.
+ */
+function clampToNow(ms) {
+  const now = Date.now();
+  return ms > now ? now : ms;
+}
+
 /** Firestore Timestamps, Dates and ISO strings all become milliseconds. Anything else is 0. */
 export function toMs(value) {
   if (!value) return 0;
   if (typeof value === 'object') {
-    if (typeof value.toMillis === 'function') return value.toMillis();          // Timestamp
-    if (typeof value.seconds === 'number') return value.seconds * 1000;          // plain {seconds}
-    if (value instanceof Date) return value.getTime();
+    if (typeof value.toMillis === 'function') return clampToNow(value.toMillis());   // Timestamp
+    if (typeof value.seconds === 'number') return clampToNow(value.seconds * 1000);  // {seconds}
+    if (value instanceof Date) return clampToNow(value.getTime());
   }
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') return clampToNow(value);
   const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
+  return Number.isNaN(parsed) ? 0 : clampToNow(parsed);
 }
 
 export function lastSavedMs(player) {

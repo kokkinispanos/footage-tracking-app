@@ -123,6 +123,23 @@ export function PlayerProvider({ children }) {
       .catch(() => {});
   }, [docId]);
 
+  // 4b. Once Firebase says he has proved he owns his address, write it where the coach can
+  //     match on it. Until then the record has no `authEmail` and no old record can be
+  //     carried across to him — which is the point. See dbService.claimVerifiedEmail.
+  const claimedRef = useRef(null);
+  useEffect(() => {
+    if (!docId || !user?.emailVerified || !user.email || !data) return;
+    const real = user.email.trim().toLowerCase();
+    if ((data.authEmail || '') === real) return;
+
+    const attempt = `${docId}:${real}`;
+    if (claimedRef.current === attempt) return;
+    claimedRef.current = attempt;
+
+    dbService.claimVerifiedEmail(docId, real)
+      .catch(() => { claimedRef.current = null; });
+  }, [docId, user?.emailVerified, user?.email, data]);
+
   // 5. If he changed his sign-in email, the record catches up here.
   //    The change itself happens in Firebase when he clicks the link in the new inbox, so
   //    this is the first moment the app can know about it.

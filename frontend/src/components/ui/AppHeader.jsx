@@ -3,14 +3,20 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, LogOut, Loader2, AlertTriangle, ChevronDown, Settings, CloudOff } from 'lucide-react';
 import { Wordmark } from './Brand';
 import { Button } from './Button';
-import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useOnlineStatus, useDurableOffline } from '../../hooks/useOnlineStatus';
 import { cn } from '../../utils/cn';
 
-function SaveIndicator({ status, online }) {
+function SaveIndicator({ status, online, durable }) {
   if (!online) {
-    return (
+    // Two different truths. Claiming the first one when the second is true is how a player
+    // closes his tab believing his work is safe when it is about to vanish.
+    return durable ? (
       <span className="flex items-center gap-1.5 text-[11px] text-warning bg-warning/10 border border-warning/25 px-2.5 py-1 rounded-full">
         <CloudOff className="w-3 h-3" /> Offline — saved on this device
+      </span>
+    ) : (
+      <span className="flex items-center gap-1.5 text-[11px] text-error bg-error/10 border border-error/25 px-2.5 py-1 rounded-full">
+        <CloudOff className="w-3 h-3" /> Offline — keep this tab open
       </span>
     );
   }
@@ -41,17 +47,18 @@ function SaveIndicator({ status, online }) {
 export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, accountLink = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const online = useOnlineStatus();
+  const durable = useDurableOffline();
 
   return (
     <header className="sticky top-0 z-50 bg-background/85 backdrop-blur-xl border-b border-white/[0.07]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Wordmark sub={subtitle} />
-          <div className="hidden sm:block"><SaveIndicator status={saveStatus} online={online} /></div>
+          <div className="hidden sm:block"><SaveIndicator status={saveStatus} online={online} durable={durable} /></div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="sm:hidden"><SaveIndicator status={saveStatus} online={online} /></div>
+          <div className="sm:hidden"><SaveIndicator status={saveStatus} online={online} durable={durable} /></div>
           {right}
 
           {userName && (

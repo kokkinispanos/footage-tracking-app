@@ -1,5 +1,31 @@
 # Go-live steps for the rebuilt sign-in — read this once, do it once
 
+> ## ⚠ UPDATE, 2026-09-09 (checkpoint 2): republish `firestore.rules`
+>
+> The rules changed and the new ones must be published before you carry any old record
+> across. Firestore Database → Rules → select all → paste the whole of `firestore.rules`
+> → Publish. Same as step 3 below. **Two minutes.**
+>
+> **Why.** "Bring across" matched an old record to a new account by email — and the email it
+> compared was the one the player types into his own profile. He could put a team-mate's
+> address there, or simply register an account using it (Firebase lets anyone create an
+> account for any address without proving they can read that inbox), and the button would
+> have offered him that team-mate's footage. One click from you and he would have had it.
+>
+> The record now carries `authEmail`, which the rules only accept if it is the address
+> Firebase says you are signed in as AND that Firebase says you have confirmed by clicking
+> the link sent to it. The match is made on that field. An attacker can hold an account on
+> someone else's address; he cannot confirm it.
+>
+> **What you will see.** A player who has registered but not yet clicked his confirmation
+> link now reads "Registered — waiting for him to confirm his email" instead of offering the
+> button. That is correct: ask him to check his inbox. "Bring across" also asks you to
+> confirm, naming both records, before it copies anything.
+>
+> The rules also now check the SHAPE of what is written, so one player cannot store a
+> malformed record that crashes your whole player list.
+
+
 Written 2026-09-09, checkpoint 1. Everything in the code is done. What is left needs the
 Firebase console, which only you can open. It is about **15 minutes**.
 
@@ -85,9 +111,14 @@ app never gave them a real account.
 1. Message each player: *"We rebuilt the app to keep your information private. Please go to
    [link] and create your account again with the same email address. Your footage is already
    there waiting."*
-2. When one of them registers, open the admin view. A yellow panel at the top lists the old
-   records. When the emails match, the record shows a **Bring across** button. Press it. His old
-   clips are copied onto his new account (the old record is kept, untouched, as a backup).
+2. When one of them registers **and confirms his email**, open the admin view. A yellow panel
+   at the top lists the old records. When the confirmed address matches, the record shows a
+   **Bring across** button. Press it, check the two names in the confirmation, and his old clips
+   are copied onto his new account (the old record is kept, untouched, as a backup).
+
+   Until he clicks the link in his inbox the row says "Registered — waiting for him to confirm
+   his email". That wait is deliberate: the confirmed address is the only proof we have that the
+   person who registered is the person the old record belongs to.
 3. Any record still showing **Clear password** — press it now, whether or not he has registered.
    That deletes the password the old app saved, and moves any notes you wrote about him into the
    admin-only collection at the same time.
@@ -126,6 +157,9 @@ Not a nice message to send. Much better than the alternative, and it is the hone
 | No password reset | "Forgot your password" on the login screen |
 | No email verification | Sent on signup, with a reminder banner |
 | Your private notes sat on the player's own record, where he could read them | A separate `adminNotes` collection only admins can open |
+| Old records matched on an email the player could type himself | Matched on `authEmail`, which the rules only accept from a confirmed address |
+| Any shape of data could be written to a record | The rules check types, so one player cannot crash your player list |
+| Signing out left every record cached in the browser | Signing out empties the on-device cache |
 
 No player data was moved or deleted to make any of this work. Old records stay exactly where they
 are; the admin button copies their contents onto the account the player creates.

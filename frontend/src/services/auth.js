@@ -11,7 +11,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, terminate, clearIndexedDbPersistence } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
 /**
@@ -87,8 +87,27 @@ export const authService = {
     return cred.user;
   },
 
+  /**
+   * Sign out AND empty the on-device cache.
+   *
+   * Firestore's cache keeps whatever this account was allowed to read — for the coach that
+   * is every player record and every private note — and Firebase does not clear it on sign
+   * out. On a shared laptop the next person signing in shares the browser profile and could
+   * read it straight out of IndexedDB. So: sign out, tear the cache down, and let the caller
+   * reload into a fresh Firestore instance.
+   *
+   * Best effort by design. Clearing fails if another tab still holds the database open, and
+   * a failure here must never leave someone still signed in — the sign-out has already
+   * happened by then.
+   */
   async logout() {
     await signOut(auth);
+    try {
+      await terminate(db);
+      await clearIndexedDbPersistence(db);
+    } catch {
+      // Another tab has it open, or persistence never started. The reload still follows.
+    }
   },
 
   async sendReset(email) {

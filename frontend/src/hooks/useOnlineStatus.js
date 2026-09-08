@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { offlineStorageAvailable } from '../services/firebase';
 
 /**
  * Is the browser online?
@@ -28,4 +29,23 @@ export function useOnlineStatus() {
   }, []);
 
   return online;
+}
+
+/**
+ * Can this browser hold his work while he is offline?
+ *
+ * `true` while we are still finding out, because the honest default is the reassuring one:
+ * saying "we cannot keep your changes" to someone whose browser is perfectly fine would
+ * make him stop working for no reason. It settles within a moment of load.
+ */
+export function useDurableOffline() {
+  const [durable, setDurable] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    offlineStorageAvailable.then((ok) => { if (!cancelled) setDurable(ok); });
+    return () => { cancelled = true; };
+  }, []);
+
+  return durable;
 }

@@ -12,7 +12,9 @@ import { Button } from '../components/ui/Button';
 import { StatusPill } from '../components/ui/Brand';
 import { Splash } from '../components/ui/Splash';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { cn } from '../utils/cn';
+import { label, initial } from '../utils/safe';
 
 const BAR_TONE = { error: 'bg-error', warning: 'bg-warning', success: 'bg-success' };
 
@@ -24,19 +26,42 @@ const BAR_TONE = { error: 'bg-error', warning: 'bg-warning', success: 'bg-succes
 function LegacyPanel({ legacy, players, onLinked }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
+  const { confirm, dialog } = useConfirm();
 
   const stillHoldingPasswords = legacy.filter((r) => r.password !== undefined);
   if (legacy.length === 0) return null;
 
+  // Matched on `authEmail`: the address Firebase says that player has PROVED he owns by
+  // clicking the link sent to it. NEVER on `profile.email`, which the player types himself —
+  // he could put a team-mate's address there and wait for you to press the button below.
   const matchFor = (record) => {
     const email = (record.profile?.email || '').trim().toLowerCase();
     if (!email) return null;
     return players.find(
-      (p) => p.authUid && (p.profile?.email || '').trim().toLowerCase() === email
+      (p) => p.authUid && (p.authEmail || '').trim().toLowerCase() === email
+    ) || null;
+  };
+
+  // Someone has registered with this address but has not clicked the link yet. Shown so the
+  // wait is explained, rather than looking like nothing happened.
+  const unverifiedClaimFor = (record) => {
+    const email = (record.profile?.email || '').trim().toLowerCase();
+    if (!email) return null;
+    return players.find(
+      (p) => p.authUid
+        && !(p.authEmail || '')
+        && (p.profile?.email || '').trim().toLowerCase() === email
     ) || null;
   };
 
   const carryAcross = async (record, match) => {
+    const ok = await confirm({
+      title: 'Carry this footage across?',
+      body: `Everything on "${record.profile?.fullName || 'this old record'}" (${record.profile?.email || 'no email'}) will be copied onto the account of ${match.profile?.fullName || 'the registered player'}, who signs in as ${match.authEmail}. He will be able to see all of it. Check those are the same person.`,
+      confirmText: 'Yes, carry it across',
+    });
+    if (!ok) return;
+
     setBusy(record.id);
     setError('');
     try {
@@ -87,6 +112,8 @@ function LegacyPanel({ legacy, players, onLinked }) {
 
       {error && <p className="text-sm text-error bg-error/10 border border-error/20 rounded-xl px-3 py-2">{error}</p>}
 
+      {dialog}
+
       <div className="space-y-2">
         {legacy.map((record) => {
           const match = matchFor(record);
@@ -95,10 +122,10 @@ function LegacyPanel({ legacy, players, onLinked }) {
             <div key={record.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl bg-black/25 border border-white/[0.07] p-3.5">
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm text-ink truncate">
-                  {record.profile?.fullName || 'Unnamed record'}
+                  {label(record.profile?.fullName, 'Unnamed record')}
                 </div>
                 <div className="text-xs text-ink-faint truncate mt-0.5">
-                  {record.profile?.email || 'no email'} · {record.profile?.position || 'no position'}
+                  {label(record.profile?.email, 'no email')} · {label(record.profile?.position, 'no position')}
                 </div>
               </div>
 
@@ -120,6 +147,8 @@ function LegacyPanel({ legacy, players, onLinked }) {
                   >
                     <Link2 className="w-3.5 h-3.5" /> Bring across
                   </Button>
+                ) : unverifiedClaimFor(record) ? (
+                  <StatusPill tone="warning">Registered — waiting for him to confirm his email</StatusPill>
                 ) : (
                   <StatusPill tone="neutral">Waiting for him to register</StatusPill>
                 )}
@@ -166,13 +195,13 @@ export function AdminOverview() {
       activity: describeActivity(p),
     }));
     return enriched
-      .filter((p) => !search || (p.profile?.fullName || '').toLowerCase().includes(search.toLowerCase())
-                             || (p.profile?.email || '').toLowerCase().includes(search.toLowerCase()))
-      .filter((p) => !positionFilter || p.profile?.position === positionFilter)
+      .filter((p) => !search || label(p.profile?.fullName).toLowerCase().includes(search.toLowerCase())
+                             || label(p.profile?.email).toLowerCase().includes(search.toLowerCase()))
+      .filter((p) => !positionFilter || label(p.profile?.position) === positionFilter)
       .sort((a, b) => {
         if (sortBy === 'quietest') return lastActiveMs(a) - lastActiveMs(b);
         if (sortBy === 'newest') return createdAtMs(b) - createdAtMs(a);
-        if (sortBy === 'az') return (a.profile?.fullName || '').localeCompare(b.profile?.fullName || '');
+        if (sortBy === 'az') return label(a.profile?.fullName).localeCompare(label(b.profile?.fullName));
         if (sortBy === 'most_complete') return b.stats.percent - a.stats.percent;
         return a.stats.percent - b.stats.percent;   // least complete first: who needs chasing
       });
@@ -185,7 +214,7 @@ export function AdminOverview() {
   );
 
   const positions = useMemo(
-    () => [...new Set(active.map((p) => p.profile?.position).filter(Boolean))].sort(),
+    () => [...new Set(active.map((p) => label(p.profile?.position)).filter(Boolean))].sort(),
     [active]
   );
 
@@ -273,20 +302,20 @@ export function AdminOverview() {
                 >
                   <div className="flex items-center gap-4">
                     <span className="w-10 h-10 rounded-xl bg-brand-sheen flex items-center justify-center text-sm font-semibold text-white flex-none">
-                      {(player.profile?.fullName || '?').trim().charAt(0).toUpperCase()}
+                      {initial(player.profile?.fullName)}
                     </span>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-ink truncate">
-                          {player.profile?.fullName || 'Unnamed'}
+                          {label(player.profile?.fullName, 'Unnamed')}
                         </span>
                         {player.profile?.position && (
-                          <StatusPill>{player.profile.position}</StatusPill>
+                          <StatusPill>{label(player.profile.position)}</StatusPill>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <span className="text-xs text-ink-faint truncate">{player.profile?.email}</span>
+                        <span className="text-xs text-ink-faint truncate">{label(player.profile?.email)}</span>
                         <span className={cn(
                           'text-xs flex-none',
                           player.activity.tone === 'error' && 'text-error',

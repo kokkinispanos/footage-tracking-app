@@ -7,6 +7,7 @@ import { SignUp } from './pages/SignUp';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Splash } from './components/ui/Splash';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // Split out of the first download. A player never opens the admin screens, and he reaches
 // his account page rarely — no reason to make him wait for either on a phone at a ground.
@@ -36,27 +37,29 @@ function PublicOnly({ children }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <PlayerProvider>
-        <BrowserRouter>
-          <Suspense fallback={<Splash />}>
-            <Routes>
-              <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
-              <Route path="/signup" element={<PublicOnly><SignUp /></PublicOnly>} />
-              <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <PlayerProvider>
+          <BrowserRouter>
+            <Suspense fallback={<Splash />}>
+              <Routes>
+                <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+                <Route path="/signup" element={<PublicOnly><SignUp /></PublicOnly>} />
+                <Route path="/forgot-password" element={<PublicOnly><ForgotPassword /></PublicOnly>} />
 
-              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-              <Route path="/account" element={<Protected><Account /></Protected>} />
+                <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+                <Route path="/account" element={<Protected><Account /></Protected>} />
 
-              <Route path="/admin" element={<Protected adminOnly><AdminOverview /></Protected>} />
-              <Route path="/admin/player/:id" element={<Protected adminOnly><AdminPlayerDetail /></Protected>} />
+                <Route path="/admin" element={<Protected adminOnly><AdminOverview /></Protected>} />
+                <Route path="/admin/player/:id" element={<Protected adminOnly><AdminPlayerDetail /></Protected>} />
 
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </PlayerProvider>
-    </AuthProvider>
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </PlayerProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

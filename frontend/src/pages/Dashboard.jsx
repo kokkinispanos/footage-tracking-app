@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MailWarning, LifeBuoy, Download, CloudOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
-import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useOnlineStatus, useDurableOffline } from '../hooks/useOnlineStatus';
 import { calculateCompletion } from '../utils/completion';
 import { AppHeader } from '../components/ui/AppHeader';
 import { Splash } from '../components/ui/Splash';
@@ -46,6 +46,7 @@ export function Dashboard() {
   const { user, logout, resendVerification } = useAuth();
   const { playerData, loading, notFound, saveStatus } = usePlayer();
   const online = useOnlineStatus();
+  const durable = useDurableOffline();
   const [verificationSent, setVerificationSent] = useState(false);
 
   // `scroll-mt-24` on each anchor keeps the sticky header from covering the heading.
@@ -82,10 +83,11 @@ export function Dashboard() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-7 sm:pt-9 space-y-6">
         {!online && (
           <div className="flex items-start gap-3 bg-warning/[0.08] border border-warning/25 rounded-2xl px-4 py-3.5 animate-fadeIn">
-            <CloudOff className="w-5 h-5 text-warning flex-none mt-0.5" />
+            <CloudOff className={durable ? "w-5 h-5 text-warning flex-none mt-0.5" : "w-5 h-5 text-error flex-none mt-0.5"} />
             <p className="text-sm text-ink-muted leading-relaxed">
-              You are offline. Keep going — everything you add is saved on this device and sent
-              to us the moment you have signal again. Do not clear your browser data until then.
+              {durable
+                ? 'You are offline. Keep going — everything you add is saved on this device and sent to us the moment you have signal again. Do not clear your browser data until then.'
+                : 'You are offline, and this browser is not letting us store anything on your device — a private window will do that. You can keep typing, but do not close this tab until you are back online, or what you add now will be lost.'}
             </p>
           </div>
         )}

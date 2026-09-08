@@ -79,10 +79,67 @@ service cloud.firestore {
           && !('adminNotes' in request.resource.data);
       }
 
+      // ------------------------------------------------- the verified email
+
+      // `authEmail` is the ONE field on this record that cannot be made up.
+      //
+      // Why it exists: carrying an old record across matches on an email address. If that
+      // address came from `profile.email` — which the player writes himself — then anyone
+      // could type a team-mate's address into his own profile and wait for the coach to
+      // press "Bring across", and the coach would have handed him another player's footage.
+      // Registering with someone else's address is not enough either: Firebase lets you
+      // create an account for any address without proving you can read that inbox.
+      //
+      // So this field may only ever be set to the address Firebase itself says you are
+      // signed in as, AND only once Firebase says you have clicked the link in it. An
+      // attacker can hold an account on a victim's address; he cannot verify it.
+      function myVerifiedEmail() {
+        return request.auth.token.email_verified == true
+          && request.resource.data.authEmail == request.auth.token.email;
+      }
+
+      function authEmailUntouchedOrMine() {
+        return !('authEmail' in request.resource.data.diff(resource.data).affectedKeys())
+          || myVerifiedEmail();
+      }
+
+      // ------------------------------------------------------ shape of a record
+      // The keys were always restricted; the VALUES were not, so a player could store a map
+      // where the admin list expects a name and take the coach's dashboard down with it.
+      function strOk(m, k) { return !(k in m) || m[k] is string; }
+
+      function profileOk() {
+        return !('profile' in request.resource.data)
+          || (request.resource.data.profile is map
+              && strOk(request.resource.data.profile, 'fullName')
+              && strOk(request.resource.data.profile, 'email')
+              && strOk(request.resource.data.profile, 'position')
+              && strOk(request.resource.data.profile, 'createdAt')
+              // lastSeenAt is a server timestamp now; older records hold an ISO string.
+              && (!('lastSeenAt' in request.resource.data.profile)
+                  || request.resource.data.profile.lastSeenAt is timestamp
+                  || request.resource.data.profile.lastSeenAt is string));
+      }
+
+      function listOk(k) {
+        return !(k in request.resource.data) || request.resource.data[k] is list;
+      }
+
+      function mapOk(k) {
+        return !(k in request.resource.data) || request.resource.data[k] is map;
+      }
+
+      function wellFormed() {
+        return profileOk()
+          && listOk('fullGames') && listOk('topThreeClips')
+          && mapOk('skillClips') && mapOk('photos') && mapOk('driveFolder')
+          && (!('authEmail' in request.resource.data) || request.resource.data.authEmail is string);
+      }
+
       // What a player may change on his own record.
       function ownedKeysOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(sectionKeys().concat(['updatedAt']));
+          .hasOnly(sectionKeys().concat(['authEmail', 'updatedAt']));
       }
 
       // What an admin may change: the sections (so he can repair a record and carry an old
@@ -101,7 +158,11 @@ service cloud.firestore {
       function validNewRecord() {
         return request.auth.uid == playerId
           && request.resource.data.authUid == request.auth.uid
-          && request.resource.data.keys().hasOnly(sectionKeys().concat(['authUid', 'updatedAt']));
+          && request.resource.data.keys()
+               .hasOnly(sectionKeys().concat(['authUid', 'authEmail', 'updatedAt']))
+          // A brand-new account has not verified its address yet, so `authEmail` is normally
+          // absent here and written later. If it IS present it must already be the real one.
+          && (!('authEmail' in request.resource.data) || myVerifiedEmail());
       }
 
       // Reading his own record by id is allowed even before it exists, so a fresh signup
@@ -114,9 +175,11 @@ service cloud.firestore {
       // documents this rule refuses, so the server rejects the whole query.
       allow list: if isAdmin() || mine();
 
-      allow create: if signedIn() && validNewRecord() && noSecrets();
+      allow create: if signedIn() && validNewRecord() && noSecrets() && wellFormed();
 
       allow update: if noSecrets()
+                    && wellFormed()
+                    && authEmailUntouchedOrMine()
                     && ((mine() && ownedKeysOnly())
                         || (isAdmin() && adminKeysOnly()));
 

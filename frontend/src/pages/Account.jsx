@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, User, AtSign, KeyRound, Download, Check, AlertTriangle, FileText, Copy,
 } from 'lucide-react';
@@ -50,7 +50,7 @@ function Panel({ icon: Icon, title, description, children, status }) {
 
 export function Account() {
   const { user, logout } = useAuth();
-  const { playerData, loading, saveProfile, saveStatus } = usePlayer();
+  const { playerData, loading, notFound, saveProfile, saveStatus } = usePlayer();
 
   const [details, setDetails] = useState(null);       // { fullName, position } once loaded
   const [detailsStatus, setDetailsStatus] = useState({});
@@ -67,7 +67,9 @@ export function Account() {
   const [copied, setCopied] = useState(false);
 
   if (loading) return <Splash label="Opening your account…" />;
-  if (!playerData) return <Splash label="Opening your account…" />;
+  // An old account waiting to be brought across has no record yet. The dashboard is the
+  // screen that explains that; without this he would watch a spinner that never resolves.
+  if (notFound || !playerData) return <Navigate to="/dashboard" replace />;
 
   // Seeded on first render from the record, then owned by the form.
   const form = details ?? {

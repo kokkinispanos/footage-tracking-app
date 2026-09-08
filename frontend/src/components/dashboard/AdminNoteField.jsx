@@ -18,16 +18,27 @@ export function AdminNoteField({ docId, noteKey, initialValue = '' }) {
   const [status, setStatus] = useState('idle');   // idle | saving | saved | error
   const [isOpen, setIsOpen] = useState(!!initialValue);
   const timerRef = useRef(null);
+  const pendingRef = useRef(null);   // typed but not yet written
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  // Leaving the page used to CANCEL the pending write. Type a note, press "All players"
+  // within 800ms, and it was gone with no sign it had ever existed. Now it is sent.
+  useEffect(() => () => {
+    clearTimeout(timerRef.current);
+    if (pendingRef.current !== null) {
+      dbService.setClipNote(docId, noteKey, pendingRef.current).catch(() => {});
+      pendingRef.current = null;
+    }
+  }, [docId, noteKey]);
 
   const change = useCallback((value) => {
     setNote(value);
     setStatus('saving');
+    pendingRef.current = value;
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       try {
         await dbService.setClipNote(docId, noteKey, value);
+        if (pendingRef.current === value) pendingRef.current = null;
         setStatus('saved');
         setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 1800);
       } catch {

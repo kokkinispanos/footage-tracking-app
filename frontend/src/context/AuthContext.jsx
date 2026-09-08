@@ -12,8 +12,25 @@ const AuthContext = createContext();
  * signed-in user comes from Firebase itself on every page load, and `isAdmin` comes from a
  * document only the Firebase console can create. Nothing here can be edited by the visitor.
  */
+/**
+ * The fields the app actually reads off the signed-in user.
+ *
+ * Kept as a plain object rather than the Firebase `User`, because `reload()` mutates that
+ * object in place: React would be handed the same reference and render nothing. Anything
+ * needing the live object (re-authentication, changing a password) reaches for
+ * `authService.currentUser` directly.
+ */
+function snapshot(fbUser) {
+  return {
+    uid: fbUser.uid,
+    email: fbUser.email,
+    emailVerified: fbUser.emailVerified,
+    displayName: fbUser.displayName,
+  };
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);          // the Firebase user, or null
+  const [user, setUser] = useState(null);          // a snapshot of the Firebase user, or null
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -26,7 +43,7 @@ export function AuthProvider({ children }) {
         return;
       }
       const admin = await authService.isAdmin(fbUser.uid);
-      setUser(fbUser);
+      setUser(snapshot(fbUser));
       setIsAdmin(admin);
       setLoading(false);
     });
@@ -51,6 +68,9 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     await authService.logout();
+    // A hard reload, not a route change: authService.logout() tears down the Firestore
+    // instance to empty its cache, and every screen after this needs a live one.
+    window.location.replace('/login');
   }, []);
 
   const sendReset = useCallback(async (email) => {
@@ -63,10 +83,41 @@ export function AuthProvider({ children }) {
 
   /** After a player clicks the verification link, refresh without making him sign in again. */
   const refreshUser = useCallback(async () => {
-    if (!authService.currentUser) return;
-    await authService.currentUser.reload();
-    setUser({ ...authService.currentUser });
+    const current = authService.currentUser;
+    if (!current) return;
+    await current.reload();
+    // reload() mutates the SAME object, so handing it back to setState would change nothing
+    // on screen. The snapshot is a new object, which is what makes React notice.
+    setUser((previous) => {
+      const next = snapshot(current);
+      const same = previous
+        && previous.email === next.email
+        && previous.emailVerified === next.emailVerified
+        && previous.displayName === next.displayName;
+      return same ? previous : next;    // don't re-render on every tab focus for no reason
+    });
   }, []);
+
+  /**
+   * Ask Firebase again when he comes back to the tab.
+   *
+   * Verifying an email address and changing one both happen OUT of this tab — he clicks a
+   * link in his inbox, often on his phone. Nothing tells this tab about it. Without this the
+   * hub goes on showing the old address and the "confirm your email" banner forever, and
+   * re-authentication keeps building credentials from the stale address, so his next password
+   * change fails for no visible reason.
+   */
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState === 'visible') refreshUser().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    return () => {
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [refreshUser]);
 
   return (
     <AuthContext.Provider value={{

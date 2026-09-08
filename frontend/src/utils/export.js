@@ -1,6 +1,6 @@
 import { calculateCompletion, TARGETS } from './completion';
 import { ALL_SKILL_CATEGORIES, PHOTO_TYPES, skillLabel } from './catalog';
-import { lastActiveMs, fullDate } from './activity';
+import { lastActiveMs, lastSavedMs, fullDate } from './activity';
 
 /**
  * Getting the player's own work back out of the app.
@@ -135,12 +135,16 @@ export function buildLinkSheet(playerData) {
 
 /** Everything exactly as stored, minus the internal plumbing nobody can use outside the app. */
 export function buildRawJson(playerData) {
-  const { id, authUid, updatedAt, ...rest } = playerData || {};
+  const { id, authUid, authEmail, updatedAt, ...rest } = playerData || {};
+  const savedMs = lastSavedMs(playerData);
   return JSON.stringify(
     {
       exportedAt: new Date().toISOString(),
       exportedBy: 'Pro Placement Player Hub',
-      lastSavedAt: updatedAt ? fullDate(lastActiveMs(playerData)) : null,
+      // The last time something was SAVED. Not the last time the hub was opened — those are
+      // different facts and this file used to report the second one under the first one's name.
+      lastSavedAt: savedMs ? new Date(savedMs).toISOString() : null,
+      lastOpenedAt: lastActiveMs(playerData) ? new Date(lastActiveMs(playerData)).toISOString() : null,
       player: rest,
     },
     null,

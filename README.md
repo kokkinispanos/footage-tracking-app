@@ -22,7 +22,7 @@ firestore.rules          THE SECURITY OF THE APP. Read this before changing anyt
 storage.rules            Passport / CV / headshot uploads: owner and admin only.
 firebase.json            So `firebase deploy --only firestore:rules` works if the CLI is installed.
 MIGRATION.md             The console steps to switch sign-in on and close the database.
-rules-tests/             46 tests that PROVE firestore.rules does what it says. `npm test`.
+rules-tests/             60 tests that PROVE firestore.rules does what it says. `npm test`.
 AUDIT_2026-09-08.md      Where this all came from: what was broken and what is planned.
 frontend/
   dev.mjs                Starts Vite with the right working directory (the path has spaces).
@@ -67,7 +67,7 @@ npm install
 npm test
 ```
 
-Starts the Firestore emulator (needs Java), runs `firestore.rules` against 47 cases and exits
+Starts the Firestore emulator (needs Java), runs `firestore.rules` against 60 cases and exits
 non-zero if any of them lets something through. **Run this before changing the rules and after.**
 The rules are the only thing standing between a signed-in player and everyone else's data; a
 comment saying they work is not evidence.
@@ -91,6 +91,11 @@ comment saying they work is not evidence.
 - **`profile.lastSeenAt` lives inside `profile`.** It would read better as a top-level field, but
   the rules only let a player write the named sections — a new top-level key would be refused.
   Nested keeps it legal without redeploying rules.
+- **`authEmail` is not the same field as `profile.email`, and the difference matters.** The
+  player writes `profile.email`; `authEmail` can only be written to the address Firebase says he
+  is signed in as and has confirmed. Anything that decides who gets access to what — carrying an
+  old record across, above all — must use `authEmail`. Matching on the one he can type is how one
+  player ends up with another player's footage.
 - **Changing an email uses `verifyBeforeUpdateEmail`, not `updateEmail`.** The confirmation goes
   to the new address, so a typo cannot lock a player out of his own account. It is also the only
   variant that still works with email-enumeration protection switched on.

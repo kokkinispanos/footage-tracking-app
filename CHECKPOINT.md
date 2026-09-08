@@ -90,7 +90,7 @@ advice is scheduled, not ignored:
   passport — possession of one bypasses the rules; restrict filenames and object counts; treat
   the browser-reported MIME type as untrusted.
 - **Checkpoint 2:** rule tests on the Firebase emulator, which needs `firebase-tools` installed.
-  — DONE in checkpoint 2: `rules-tests/`, 47 tests, all passing.
+  — DONE in checkpoint 2: `rules-tests/`, 60 tests, all passing.
 - **Operational:** MFA on the admin account, and a retention/deletion policy once identity
   documents exist.
 
@@ -192,7 +192,7 @@ that were not there.
 - Fixed "8 of 23 pieces in" — a sentence that stopped mid-air, introduced in checkpoint 1.
 
 **Rule tests — the security is now proved, not asserted** (carried over from checkpoint 1's list)
-- `rules-tests/` runs `firestore.rules` against the Firestore emulator: **47 tests, all passing**.
+- `rules-tests/` runs `firestore.rules` against the Firestore emulator: **60 tests, all passing**.
   `npm test` in that folder starts the emulator itself. It needs Java, which is installed.
 - What they prove: a stranger reads and writes nothing; a player cannot read another record,
   list the collection, query for someone else, store a `password` or `role`, write coach notes,
@@ -205,6 +205,61 @@ that were not there.
   than `profile`, the rules would refuse it and the trail would quietly stop working in
   production while looking fine in the code. It passes.
 
+**Three bugs in my own checkpoint-2 code, found by re-reading it and by the Codex review**
+- **A save race that could revert a player's newer edit.** If he kept typing while a save was in
+  flight, the completed save cleared that section's dirty flag and deleted its timer handle. The
+  snapshot for that write carries the OLDER value, and the dirty flag was the only thing stopping
+  it landing on top of what he had typed since — so the newer edit was reverted on screen and
+  then saved away. The deleted handle was the NEW timer's, so closing the tab in that window
+  dropped the edit entirely. Each edit now stamps a per-section counter and a finished save only
+  clears the flag if it is still the current edit.
+- **The email sync counted as progress.** Copying his new email onto the record stamped
+  `updatedAt`, which the admin list reads as "he added something". It is bookkeeping he did not
+  do. That path now passes `touch: false`.
+- **The email sync retried on every snapshot**, because it depends on `data.profile`, a fresh
+  object each time. One mismatch now produces one attempt; a failed write clears the guard.
+
+**The Codex review (`gpt-5.6-sol`, high effort) — nine real findings, all fixed**
+
+Its opening line was "do not ship the legacy-record linking flow as written", and it was right.
+
+1. **CRITICAL — a forged email could capture another player's footage.** "Bring across" matched
+   an old record to a new account on `profile.email`, which the player writes himself. He could
+   type a team-mate's address into his own profile, or just register an account using it (Firebase
+   lets anyone create an account for any address without proving they can read that inbox), and
+   the coach's click would have handed him that team-mate's clips.
+   **Fixed:** the record now carries `authEmail`, which the rules accept only when it equals the
+   address Firebase says you are signed in as AND Firebase says you have confirmed it. The match
+   uses that field. "Bring across" also confirms, naming both records. Rules changed —
+   **`firestore.rules` must be republished**, see `MIGRATION.md`.
+2. **A save race could revert a newer edit** — the same one found independently while re-reading;
+   see above.
+3. **A malformed record could crash the whole player list.** The rules restricted which keys could
+   be written but not what could be in them, so a player could store a map where a name goes and
+   the coach's dashboard would throw on render, with no way back.
+   **Fixed:** the rules now check types, `utils/safe.js` renders untrusted values without assuming
+   their shape, and an `ErrorBoundary` catches anything still left.
+4. **The offline banner promised more than it could keep.** If IndexedDB is unavailable (a private
+   window, an old browser) Firestore silently falls back to a memory cache, and the app still said
+   "saved on this device" — the one lie that costs a player his work.
+   **Fixed:** `offlineStorageAvailable` probes IndexedDB and the message tells the truth, including
+   "keep this tab open" when it cannot.
+5. **An email change never converged in an open tab**, because clicking the link happens elsewhere
+   and nothing told this tab. **Fixed:** the user is re-checked on focus and visibility change.
+6. **The activity trail trusted the phone's clock.** A device set a year ahead read as "active just
+   now" until that date arrived. **Fixed:** `lastSeenAt` is a server timestamp, and future values
+   are clamped for records written before that.
+7. **The cache survived sign-out**, including every record and note the coach had opened, on a
+   shared browser. **Fixed:** signing out terminates Firestore, clears the cache and reloads.
+8. **Admin notes were lost if you navigated within 800ms of typing** — the pending write was
+   cancelled, not sent. **Fixed:** both note fields flush on the way out.
+9. **The admin player page was a one-time read.** The coach opens a player while talking to him,
+   the player adds the clips, the page keeps showing the old state. **Fixed:** it is live now.
+10. **Invalid links counted toward 100%.** Progress was array length, so `not-a-url` moved the bar.
+    **Fixed:** only entries with a real link count.
+11. **The export mislabelled `lastSavedAt`**, reporting the last time the hub was OPENED under the
+    name of the last time it was saved. **Fixed**, and both are now reported separately.
+
 ### Verified
 - Build and lint clean (0 errors, 2 known fast-refresh warnings on the two context files).
 - The pure logic — completion, next step, activity, link sheet, raw JSON — run against a
@@ -212,6 +267,9 @@ that were not there.
 - The dashboard and account screens rendered and driven through a throwaway harness (desktop and
   375px): section anchors resolve, the jump scrolls, the goalkeeper warning fires, the export
   button runs without error, no console errors. The harness was removed again.
+- The offline cache confirmed live in the browser, not just configured: after the first Firestore
+  call the IndexedDB `firestore/[DEFAULT]/footage-tracker/main` exists, and the same call returns
+  `permission-denied` while signed out — the published rules answering from inside the app.
 - Not verified end-to-end signed in: that needs a real account, and creating one is Panos's to do.
 
 ### Deliberately not done

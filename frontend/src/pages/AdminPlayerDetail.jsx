@@ -39,29 +39,50 @@ export function AdminPlayerDetail() {
 
   // The record and the notes are two separate documents on purpose: notes live in an
   // admin-only collection, because Firestore cannot hide a field from whoever reads the doc.
+  //
+  // Both are LIVE. The coach opens a player while talking to him and asks for two more clips;
+  // the player adds them; this page used to keep showing what it showed five minutes ago.
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([dbService.getPlayerById(id), dbService.getAdminNotes(id)])
-      .then(([player, notes]) => {
-        if (cancelled) return;
-        setPlayerData(player);
-        setAdminNotes(notes);
-        setGeneralNote(notes?.general || '');
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    setLoading(true);
+    let seenPlayer = false;
+
+    const stopPlayer = dbService.watchPlayer(id, (player) => {
+      setPlayerData(player);
+      seenPlayer = true;
+      setLoading(false);
+    });
+
+    const stopNotes = dbService.watchAdminNotes(id, (notes) => {
+      setAdminNotes(notes);
+      // Only seed the textarea the first time; after that he may be typing in it.
+      setGeneralNote((current) => (current === '' ? (notes?.general || '') : current));
+      if (seenPlayer) setLoading(false);
+    });
+
+    return () => { stopPlayer(); stopNotes(); };
   }, [id]);
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  // Leaving used to CANCEL the pending note write: type a note, press "All players" inside
+  // 800ms, and it was gone. Send it instead.
+  const pendingNoteRef = useRef(null);
+  useEffect(() => () => {
+    clearTimeout(timerRef.current);
+    if (pendingNoteRef.current !== null) {
+      dbService.setGeneralNote(id, pendingNoteRef.current).catch(() => {});
+      pendingNoteRef.current = null;
+    }
+  }, [id]);
 
   // Same debounced, field-path save as the per-clip notes.
   const changeNote = useCallback((value) => {
     setGeneralNote(value);
     setNoteStatus('saving');
+    pendingNoteRef.current = value;
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       try {
         await dbService.setGeneralNote(id, value);
+        if (pendingNoteRef.current === value) pendingNoteRef.current = null;
         setNoteStatus('saved');
         setTimeout(() => setNoteStatus((s) => (s === 'saved' ? 'idle' : s)), 1800);
       } catch {
@@ -96,9 +117,7 @@ export function AdminPlayerDetail() {
         fullName: editing.fullName.trim(),
         position: editing.position,
       });
-      const fresh = await dbService.getPlayerById(id);
-      setPlayerData(fresh);
-      setEditing(null);
+      setEditing(null);   // the live watcher brings the new value back on its own
     } catch (e) {
       setEditStatus(e?.message || 'Could not save that.');
     } finally {

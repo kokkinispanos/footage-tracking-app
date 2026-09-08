@@ -9,6 +9,8 @@
  *   6 photos, 1 master Drive folder.
  */
 
+import { isValidUrl } from './links';
+
 export const TARGETS = {
   fullGames: 3,
   topThreeClips: 3,
@@ -21,25 +23,33 @@ export const TOTAL_TARGET =
   TARGETS.fullGames + TARGETS.topThreeClips + TARGETS.skillClips +
   TARGETS.photos + TARGETS.driveFolder;
 
-const filled = (value) => typeof value === 'string' && value.trim().length > 0;
+/**
+ * An entry counts only if it carries something that is actually a link.
+ *
+ * It used to count array length, so "not-a-url" in the box moved the bar. The warning under
+ * the field is advice, not a gate — a player can save anything — and a progress figure that
+ * says 100% when three of the links do not open is worse than no figure at all.
+ */
+const usable = (item) => isValidUrl(item?.link);
+
+const countUsable = (list) => (Array.isArray(list) ? list.filter(usable).length : 0);
 
 export function countSkillClips(playerData) {
   return Object.values(playerData?.skillClips || {})
-    .reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+    .reduce((sum, arr) => sum + countUsable(arr), 0);
 }
 
 export function countPhotos(playerData) {
-  return Object.values(playerData?.photos || {})
-    .filter((p) => filled(p?.link)).length;
+  return Object.values(playerData?.photos || {}).filter(usable).length;
 }
 
 export function calculateCompletion(playerData) {
   const counts = {
-    fullGames: playerData?.fullGames?.length || 0,
-    topThreeClips: playerData?.topThreeClips?.length || 0,
+    fullGames: countUsable(playerData?.fullGames),
+    topThreeClips: countUsable(playerData?.topThreeClips),
     skillClips: countSkillClips(playerData),
     photos: countPhotos(playerData),
-    driveFolder: filled(playerData?.driveFolder?.link) ? 1 : 0,
+    driveFolder: isValidUrl(playerData?.driveFolder?.link) ? 1 : 0,
   };
 
   // Each section counts only up to its own target, so 40 skill clips cannot hide
