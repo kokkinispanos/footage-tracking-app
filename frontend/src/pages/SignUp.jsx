@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { GlassCard } from '../components/ui/GlassCard';
+import { readableAuthError } from '../services/auth';
+import { AuthLayout } from '../components/ui/AuthLayout';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { cn } from '../utils/cn';
 
-const POSITIONS = [
+export const POSITIONS = [
   "Goalkeeper",
   "Center Back",
   "Full Back / Wing Back",
@@ -13,104 +16,137 @@ const POSITIONS = [
   "Central Midfielder",
   "Attacking Midfielder",
   "Winger",
-  "Striker"
+  "Striker",
 ];
 
+const MIN_PASSWORD = 8;
+
 export function SignUp() {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    position: POSITIONS[0]
+  const [form, setForm] = useState({
+    fullName: '', email: '', password: '', position: POSITIONS[0],
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
-  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const change = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const longEnough = form.password.length >= MIN_PASSWORD;
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
+    if (!form.fullName.trim()) return setError('Type your full name.');
+    if (!longEnough) return setError(`Your password needs at least ${MIN_PASSWORD} characters.`);
+
     setError('');
     setLoading(true);
     try {
-      await register(formData.fullName, formData.email, formData.password, formData.position);
-      navigate('/dashboard');
+      await register(form);
+      // The router takes it from here once Firebase reports the new user.
     } catch (err) {
-      setError(err.message || 'Signup failed');
-    } finally {
+      setError(readableAuthError(err));
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <GlassCard className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-white tracking-tight">Register</h2>
-          <p className="text-sm text-gray-400 mt-1">Join the Pro Placement Program</p>
+    <AuthLayout
+      title="Create your account"
+      subtitle="This is where everything about you lives: your footage, your documents, your numbers."
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" className="text-brand-light hover:underline font-medium">Sign in</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSignup} className="space-y-4" noValidate>
+        <Input
+          label="Full name"
+          name="fullName"
+          autoComplete="name"
+          value={form.fullName}
+          onChange={change}
+          required
+          placeholder="As it appears on your passport"
+        />
+
+        <Input
+          label="Email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          value={form.email}
+          onChange={change}
+          required
+          placeholder="you@example.com"
+          hint="Use an email you check. We send everything here."
+        />
+
+        <div>
+          <Input
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={form.password}
+            onChange={change}
+            required
+            placeholder="••••••••"
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="p-2 text-ink-faint hover:text-ink transition-colors rounded-lg"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            }
+          />
+          <div className={cn(
+            "flex items-center gap-1.5 text-xs mt-2 transition-colors",
+            longEnough ? "text-success" : "text-ink-faint"
+          )}>
+            <Check className={cn("w-3.5 h-3.5", !longEnough && "opacity-40")} />
+            At least {MIN_PASSWORD} characters
+          </div>
         </div>
 
-        <form onSubmit={handleSignup} className="space-y-4">
-          <Input 
-            label="Full Name" 
-            name="fullName"
-            value={formData.fullName}
-            onChange={handleChange}
-            required 
-            placeholder="e.g. Kwame Mensah"
-          />
-          <Input 
-            label="Email Address" 
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            required 
-            placeholder="player@example.com"
-          />
-          <Input 
-            label="Password (min 6 chars)" 
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            required 
-            placeholder="••••••••"
-          />
-          
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-300">Primary Position</label>
-            <select 
-              name="position"
-              value={formData.position}
-              onChange={handleChange}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand"
-            >
-              {POSITIONS.map(pos => (
-                <option key={pos} value={pos} className="bg-background text-white">{pos}</option>
-              ))}
-            </select>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="position" className="text-[13px] font-medium text-ink-muted">
+            Main position
+          </label>
+          <select
+            id="position"
+            name="position"
+            value={form.position}
+            onChange={change}
+            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink
+                       focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 transition-all"
+          >
+            {POSITIONS.map((p) => (
+              <option key={p} value={p} className="bg-elevated text-ink">{p}</option>
+            ))}
+          </select>
+          <span className="text-xs text-ink-faint">
+            This decides which skill categories you are asked for. You can change it later.
+          </span>
+        </div>
+
+        {error && (
+          <div role="alert" className="flex items-start gap-2 text-sm text-error bg-error/10 border border-error/20 px-3 py-2.5 rounded-xl">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-none" />
+            <span>{error}</span>
           </div>
+        )}
 
-          {error && <p className="text-error text-sm text-center bg-error/10 py-2 rounded">{error}</p>}
-
-          <Button type="submit" className="w-full mt-2" disabled={loading}>
-            {loading ? 'Registering...' : 'Create Account'}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-400">
-          Already registered? <Link to="/login" className="text-brand-light hover:underline ml-1">Log in</Link>
-        </p>
-      </GlassCard>
-    </div>
+        <Button type="submit" size="lg" className="w-full" loading={loading}>
+          {loading ? 'Creating your account…' : 'Create account'}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

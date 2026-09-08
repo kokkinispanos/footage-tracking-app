@@ -1,35 +1,51 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { cn } from "../../utils/cn";
 
-export const Input = React.forwardRef(({ 
-  label, 
-  error, 
+export const Input = React.forwardRef(({
+  label,
+  error,
+  hint,
   className,
   wrapperClassName,
-  ...props 
+  rightSlot,
+  ...props
 }, ref) => {
+  const autoId = useId();
+  const id = props.id || autoId;
+
   return (
     <div className={cn("flex flex-col gap-1.5", wrapperClassName)}>
       {label && (
-        <label className="text-sm font-medium text-gray-300">
+        <label htmlFor={id} className="text-[13px] font-medium text-ink-muted">
           {label}
         </label>
       )}
-      <input
-        ref={ref}
-        className={cn(
-          "w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5",
-          "text-white placeholder:text-gray-500",
-          "focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand",
-          "transition-all duration-200",
-          error && "border-error focus:ring-error/20 focus:border-error",
-          className
+      <div className="relative">
+        <input
+          id={id}
+          ref={ref}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
+          className={cn(
+            "w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3",
+            "text-ink placeholder:text-ink-faint",
+            "focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60",
+            "transition-all duration-200",
+            rightSlot && "pr-11",
+            error && "border-error/70 focus:ring-error/25 focus:border-error",
+            className
+          )}
+          {...props}
+        />
+        {rightSlot && (
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2">{rightSlot}</div>
         )}
-        {...props}
-      />
-      {error && (
-        <span className="text-xs text-error mt-0.5">{error}</span>
-      )}
+      </div>
+      {error ? (
+        <span id={`${id}-error`} role="alert" className="text-xs text-error">{error}</span>
+      ) : hint ? (
+        <span id={`${id}-hint`} className="text-xs text-ink-faint">{hint}</span>
+      ) : null}
     </div>
   );
 });

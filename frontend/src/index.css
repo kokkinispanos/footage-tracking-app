@@ -1,20 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    @apply bg-background text-white antialiased selection:bg-brand selection:text-white;
+    @apply bg-background text-ink font-sans antialiased selection:bg-brand selection:text-white;
+    /* Soft brand light from the top of the page, so the navy never reads as flat black. */
+    background-image:
+      radial-gradient(60rem 32rem at 78% -8%, rgba(160, 32, 204, 0.16), transparent 62%),
+      radial-gradient(48rem 28rem at 8% 0%, rgba(25, 27, 77, 0.85), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  /* Respect the notch / home indicator on phones. */
+  .safe-bottom {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+
+  /* Inputs must never be under 16px on iOS or Safari zooms the whole page on focus. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  @media (min-width: 640px) {
+    input, select, textarea {
+      font-size: 0.875rem;
+    }
   }
 }
 
 @layer components {
-  /* Scrollbar hide utility if needed */
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
   .hide-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* One hairline rule used across cards and dividers. */
+  .rule {
+    @apply border-white/[0.07];
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -1,7 +1,13 @@
-import { CheckCircle2, UserCircle, LogOut, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { MailWarning, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
+import { calculateCompletion } from '../utils/completion';
+import { AppHeader } from '../components/ui/AppHeader';
+import { Splash } from '../components/ui/Splash';
 import { Button } from '../components/ui/Button';
+import { GlassCard } from '../components/ui/GlassCard';
+import { ProgressPanel } from '../components/dashboard/ProgressPanel';
 
 import { Section1FullGames } from '../components/dashboard/Section1FullGames';
 import { Section2TopClips } from '../components/dashboard/Section2TopClips';
@@ -9,87 +15,86 @@ import { Section3SkillClips } from '../components/dashboard/Section3SkillClips';
 import { Section4Photos } from '../components/dashboard/Section4Photos';
 import { Section5Drive } from '../components/dashboard/Section5Drive';
 
-export function Dashboard() {
-  const { logout } = useAuth();
-  const { playerData, loading, saveStatus } = usePlayer();
+/** Shown when a signed-in player has no record yet — an old account waiting to be linked. */
+function AwaitingRecord({ email, onLogout }) {
+  return (
+    <div className="min-h-dvh flex items-center justify-center px-4">
+      <GlassCard className="max-w-md text-center">
+        <div className="w-14 h-14 rounded-2xl bg-brand/10 border border-brand/25 flex items-center justify-center mx-auto mb-5">
+          <LifeBuoy className="w-6 h-6 text-brand-light" />
+        </div>
+        <h2 className="text-xl font-semibold mb-2">Your account is ready</h2>
+        <p className="text-sm text-ink-muted leading-relaxed mb-6">
+          We are connecting <span className="text-ink">{email}</span> to your existing footage.
+          It usually takes a few minutes. Refresh this page, or come back shortly — nothing you
+          sent us before has been lost.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Button onClick={() => window.location.reload()}>Refresh</Button>
+          <Button variant="ghost" onClick={onLogout}>Sign out</Button>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
 
-  if (loading || !playerData) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-brand animate-spin" />
-        <p className="text-gray-400 mt-4">Loading your dashboard...</p>
-      </div>
-    );
+export function Dashboard() {
+  const { user, logout, resendVerification } = useAuth();
+  const { playerData, loading, notFound, saveStatus } = usePlayer();
+  const [verificationSent, setVerificationSent] = useState(false);
+
+  if (loading) return <Splash label="Opening your hub…" />;
+  if (notFound || !playerData) {
+    return <AwaitingRecord email={user?.email} onLogout={logout} />;
   }
 
-  // Calculate generic progress
-  const skillClipsCount = Object.values(playerData.skillClips || {}).reduce((acc, arr) => acc + (arr?.length || 0), 0);
-  const clipsAdded = playerData.fullGames.length + playerData.topThreeClips.length + skillClipsCount;
-  const targetClips = 30;
-  const progressPercent = Math.min(100, Math.round((clipsAdded / targetClips) * 100));
+  const stats = calculateCompletion(playerData);
+  const firstName = (playerData.profile?.fullName || '').trim().split(' ')[0] || 'there';
+
+  const sendVerification = async () => {
+    try {
+      await resendVerification();
+      setVerificationSent(true);
+    } catch { /* the banner simply stays */ }
+  };
 
   return (
-    <div className="min-h-screen bg-background text-white pb-24">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 px-4 py-3">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight">Pro Placement</h1>
-            
-            {/* Save Status Indicator */}
-            {saveStatus === 'saving' && (
-              <span className="flex items-center gap-1.5 text-xs text-brand-light animate-pulse bg-brand/10 px-2 py-0.5 rounded-full">
-                <Loader2 className="w-3 h-3 animate-spin"/> Saving
-              </span>
-            )}
-            {saveStatus === 'saved' && (
-              <span className="flex items-center gap-1.5 text-xs text-success animate-fadeIn bg-success/10 px-2 py-0.5 rounded-full">
-                <CheckCircle2 className="w-3 h-3"/> Saved
-              </span>
-            )}
-            {saveStatus === 'error' && (
-              <span className="text-xs text-error bg-error/10 px-2 py-0.5 rounded-full">Save Error</span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="hidden sm:flex gap-2">
-              <UserCircle className="w-4 h-4" />
-              {playerData.profile.fullName}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={logout} className="text-gray-400 hover:text-error">
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-dvh pb-20">
+      <AppHeader
+        subtitle="Player Hub"
+        saveStatus={saveStatus}
+        userName={playerData.profile?.fullName}
+        onLogout={logout}
+      />
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 pt-8 space-y-8">
-        {/* Welcome & Progress Area */}
-        <section className="animate-fadeIn">
-          <h2 className="text-3xl font-bold mb-2">Welcome back, {playerData.profile.fullName.split(' ')[0]}</h2>
-          <p className="text-gray-400 mb-6">Let's get your footage ready for the scouts.</p>
-          
-          <div className="bg-surface border border-white/5 rounded-2xl p-6 relative overflow-hidden">
-            <div className="flex justify-between text-sm font-medium mb-3 relative z-10">
-              <span className="text-gray-300">Overall Progress</span>
-              <span className="text-brand-light">{clipsAdded} of {targetClips} clips submitted</span>
-            </div>
-            {/* Progress Bar Track */}
-            <div className="h-3 bg-black/40 rounded-full overflow-hidden relative z-10">
-              <div 
-                className="h-full bg-gradient-to-r from-brand-dark to-brand transition-all duration-500 ease-out"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            {/* Decorative background glow */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 pt-7 sm:pt-9 space-y-6">
+        {user && !user.emailVerified && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-warning/[0.08] border border-warning/25 rounded-2xl px-4 py-3.5 animate-fadeIn">
+            <MailWarning className="w-5 h-5 text-warning flex-none" />
+            <p className="text-sm text-ink-muted flex-1 leading-relaxed">
+              {verificationSent
+                ? 'Verification email sent. Check your inbox, and your spam folder.'
+                : <>Confirm your email address so we can always reach you. We sent a link to <span className="text-ink">{user.email}</span>.</>}
+            </p>
+            {!verificationSent && (
+              <Button variant="secondary" size="sm" onClick={sendVerification} className="flex-none">
+                Send it again
+              </Button>
+            )}
           </div>
+        )}
+
+        <section className="animate-riseIn">
+          <h1 className="text-2xl sm:text-3xl font-semibold mb-1.5">
+            Welcome back, {firstName}
+          </h1>
+          <p className="text-ink-muted mb-6 text-sm sm:text-base">
+            Everything a club needs to see about you lives here.
+          </p>
+          <ProgressPanel stats={stats} />
         </section>
 
-        {/* The 5 Guided Sections */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           <Section1FullGames />
           <Section2TopClips />
           <Section3SkillClips />

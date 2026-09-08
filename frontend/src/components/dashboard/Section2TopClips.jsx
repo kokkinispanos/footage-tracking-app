@@ -1,245 +1,198 @@
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Plus, Star, Pencil, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Star } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
-import { GlassCard } from '../ui/GlassCard';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
-import { EmptyState } from '../ui/EmptyState';
-import { cn } from '../../utils/cn';
+import { useConfirm } from '../ui/ConfirmDialog';
+import { StatusPill } from '../ui/Brand';
+import { SectionShell } from './SectionShell';
+import { ItemRow } from './ItemRow';
 import { AdminNoteField } from './AdminNoteField';
+import { normalizeUrl, linkWarning } from '../../utils/links';
+import { TARGETS } from '../../utils/completion';
+import { cn } from '../../utils/cn';
 
 const CATEGORIES = [
-  "Dribbling", 
-  "Passing & Vision", 
-  "Defending", 
-  "Finishing", 
-  "Movement Off the Ball", 
-  "Pressing/Hustle", 
-  "Aerial", 
-  "Other"
+  "Dribbling", "Passing & Vision", "Defending", "Finishing",
+  "Movement Off the Ball", "Pressing/Hustle", "Aerial", "Other",
 ];
 
-export function Section2TopClips({ adminMode, overrideData }) {
+const BLANK = { link: '', title: '', category: CATEGORIES[0], whyBest: '' };
+
+export function Section2TopClips({ adminMode, overrideData, adminDocId }) {
   const context = usePlayer();
   const playerData = adminMode ? overrideData : context.playerData;
-  const updatePlayerState = adminMode ? () => {} : context.updatePlayerState;
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
+  const updateSection = adminMode ? null : context.updateSection;
 
-  const [formData, setFormData] = useState({ link: '', title: '', category: CATEGORIES[0], whyBest: '' });
+  const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(BLANK);
+  const { confirm, dialog } = useConfirm();
 
   const clips = playerData?.topThreeClips || [];
+  const full = clips.length >= 3;
+  const warning = linkWarning(form.link);
 
   const openAdd = () => {
-    if (clips.length >= 3) return; // Prevent adding if 3 already exist
-    setFormData({ link: '', title: '', category: CATEGORIES[0], whyBest: '' });
-    setEditingItem(null);
-    setIsModalOpen(true);
+    if (full) return;
+    setForm(BLANK); setEditingId(null); setIsOpen(true);
   };
+  const openEdit = (clip) => { setForm({ ...BLANK, ...clip }); setEditingId(clip.id); setIsOpen(true); };
 
-  const openEdit = (item) => {
-    setFormData({ ...item });
-    setEditingItem(item.id);
-    setIsModalOpen(true);
-  };
-
-  const handleSave = (e) => {
+  const save = (e) => {
     e.preventDefault();
-    updatePlayerState(prev => {
-      let newClips = [...prev.topThreeClips];
-      if (editingItem) {
-        newClips = newClips.map(c => c.id === editingItem ? { ...formData, id: editingItem } : c);
-      } else {
-        newClips.push({ ...formData, id: uuidv4(), order: newClips.length });
-      }
-      return { ...prev, topThreeClips: newClips };
+    const entry = { ...form, link: normalizeUrl(form.link) };
+    updateSection('topThreeClips', (list = []) => (
+      editingId
+        ? list.map((c) => (c.id === editingId ? { ...entry, id: editingId } : c))
+        : [...list, { ...entry, id: uuidv4() }]
+    ));
+    setIsOpen(false);
+  };
+
+  const remove = async (id) => {
+    const ok = await confirm({
+      title: 'Delete this clip?',
+      body: 'It will be removed from your top three. You can add another one in its place.',
     });
-    setIsModalOpen(false);
+    if (ok) updateSection('topThreeClips', (list = []) => list.filter((c) => c.id !== id));
   };
 
-  const handleDelete = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this highlight clip?")) {
-      updatePlayerState(prev => ({
-        ...prev,
-        topThreeClips: prev.topThreeClips.filter(c => c.id !== id)
-      }));
-    }
-  };
-
-  const moveItem = (index, direction, e) => {
-    e.stopPropagation();
-    if (direction === -1 && index === 0) return;
-    if (direction === 1 && index === clips.length - 1) return;
-    
-    updatePlayerState(prev => {
-      const newArr = [...prev.topThreeClips];
-      const temp = newArr[index];
-      newArr[index] = newArr[index + direction];
-      newArr[index + direction] = temp;
-      return { ...prev, topThreeClips: newArr };
+  const move = (index, direction) => {
+    const to = index + direction;
+    if (to < 0 || to >= clips.length) return;
+    updateSection('topThreeClips', (list = []) => {
+      const next = [...list];
+      [next[index], next[to]] = [next[to], next[index]];
+      return next;
     });
   };
-
-  // Build fixed length array for exactly 3 slots UI
-  const slots = [0, 1, 2];
 
   return (
-    <GlassCard className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Star className="w-5 h-5 text-brand" />
-            2. Top 3 Best Clips (Highlight Opener)
-          </h2>
-          <p className="text-sm text-gray-400 mt-1 max-w-2xl">
-            These are your absolutely best moments. Scouts decide in 30 seconds — these must be explosive!
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm font-medium">
-            <span className={clips.length === 3 ? 'text-success' : 'text-warning'}>
-              {clips.length}
-            </span>
-            <span className="text-gray-500"> / 3 slots filled</span>
-          </div>
-          {!adminMode && (
-            <Button onClick={openAdd} size="sm" className="gap-2" disabled={clips.length >= 3}>
-              <Plus className="w-4 h-4" /> Add Clip
-            </Button>
-          )}
-        </div>
-      </div>
+    <SectionShell
+      icon={Star}
+      index={2}
+      title="Your top 3 clips"
+      description="The three moments that open your highlight video. A scout decides in the first 30 seconds — these are that 30 seconds. Order matters: number 1 plays first."
+      count={clips.length}
+      target={TARGETS.topThreeClips}
+      action={!adminMode && (
+        <Button onClick={openAdd} size="sm" className="gap-1.5" disabled={full}>
+          <Plus className="w-4 h-4" /> Add clip
+        </Button>
+      )}
+    >
+      <div className="space-y-2.5">
+        {[0, 1, 2].map((slot) => {
+          const clip = clips[slot];
 
-      <div className="space-y-4">
-        {slots.map((slotIndex) => {
-          const clip = clips[slotIndex];
-          return (
-            <div 
-              key={slotIndex} 
-              className={cn(
-                "group flex flex-col p-4 rounded-lg border transition-all w-full text-left min-h-[80px]",
-                clip ? "bg-black/20 border-white/5 hover:border-brand/30 hover:bg-white/5" : "bg-black/10 border-dashed border-white/10"
-              )}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
-                <div className="flex items-start gap-4 flex-1">
-                  {/* Visual Slot Number & Reorder Controls */}
-                  <div className="flex flex-col items-center gap-1">
-                    <span className={cn(
-                      "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold", 
-                      clip ? "bg-brand text-white" : "bg-white/5 text-gray-500"
-                    )}>
-                      {slotIndex + 1}
-                    </span>
-                    {!adminMode && clip && (
-                      <div className="flex flex-col gap-0.5 text-gray-500 mt-2 hidden sm:flex">
-                        <button onClick={(e) => moveItem(slotIndex, -1, e)} disabled={slotIndex === 0} className="hover:text-white disabled:opacity-30 disabled:hover:text-gray-500 py-0.5"><GripVertical className="w-4 h-4"/></button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    {clip ? (
-                      <>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-white truncate">{clip.title}</h3>
-                          <span className="text-xs bg-brand/10 text-brand-light px-2 py-0.5 rounded flex-shrink-0">
-                            {clip.category}
-                          </span>
-                        </div>
-                        <a href={clip.link} target="_blank" rel="noreferrer" onClick={e=>e.stopPropagation()} className="block text-sm text-brand-light hover:underline truncate mb-1">
-                          {clip.link}
-                        </a>
-                        {clip.whyBest && <p className="text-sm text-gray-400 line-clamp-1">{clip.whyBest}</p>}
-                      </>
-                    ) : (
-                       <div className="flex flex-col justify-center h-full">
-                         <span className="text-sm text-gray-500 font-medium">Empty Slot</span>
-                         <span className="text-xs text-gray-600">{adminMode ? "Player hasn't filled this slot." : "Click 'Add Clip' to fill this opening highlight slot"}</span>
-                       </div>
-                    )}
+          if (!clip) {
+            return (
+              <div
+                key={slot}
+                className="flex items-center gap-3.5 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4"
+              >
+                <span className="w-7 h-7 rounded-full bg-white/[0.06] text-ink-faint flex items-center justify-center text-xs font-semibold flex-none">
+                  {slot + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm text-ink-muted font-medium">Empty slot</div>
+                  <div className="text-xs text-ink-faint mt-0.5">
+                    {adminMode ? 'Not filled yet.' : 'Add the clip you would show a scout first.'}
                   </div>
                 </div>
-                
-                {!adminMode && clip && (
-                  <div className="flex items-center gap-2 mt-4 sm:mt-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <Button variant="secondary" size="sm" onClick={() => openEdit(clip)} className="px-2">
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={(e) => handleDelete(clip.id, e)} className="px-2">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
               </div>
-              
-              {adminMode && clip && (
-                <div className="w-full">
-                  <AdminNoteField 
-                    playerId={playerData.uid} 
-                    noteKey={`topclip_${clip.id}`} 
-                    initialValue={playerData.adminNotes?.perClip?.[`topclip_${clip.id}`] || ''}
-                  />
-                </div>
+            );
+          }
+
+          return (
+            <ItemRow
+              key={clip.id}
+              title={clip.title}
+              badge={
+                <>
+                  <span className={cn(
+                    "w-6 h-6 rounded-full bg-brand-sheen text-white flex items-center justify-center text-[11px] font-semibold flex-none order-first"
+                  )}>
+                    {slot + 1}
+                  </span>
+                  {clip.category && <StatusPill tone="brand">{clip.category}</StatusPill>}
+                </>
+              }
+              link={clip.link}
+              note={clip.whyBest}
+              index={slot}
+              total={clips.length}
+              onMove={move}
+              onEdit={() => openEdit(clip)}
+              onDelete={() => remove(clip.id)}
+              readOnly={adminMode}
+            >
+              {adminMode && (
+                <AdminNoteField
+                  docId={adminDocId}
+                  noteKey={`topclip_${clip.id}`}
+                  initialValue={playerData.adminNotes?.perClip?.[`topclip_${clip.id}`] || ''}
+                />
               )}
-            </div>
+            </ItemRow>
           );
         })}
       </div>
 
       {!adminMode && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingItem ? "Edit Top Clip" : "Add Top Clip"}>
-          <form onSubmit={handleSave} className="space-y-4">
-            <Input 
-              label="Clip Title *" 
-              placeholder="e.g. Long-range goal vs Olympiacos U19" 
-              value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? 'Edit clip' : 'Add a top clip'}>
+          <form onSubmit={save} className="space-y-4">
+            <Input
+              label="What happens in it?"
+              placeholder="e.g. Long-range goal vs Olympiacos U19"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
               autoFocus
             />
-            <Input 
-              label="Link (Google Drive, YouTube) *" 
-              type="url"
-              placeholder="https://..." 
-              value={formData.link}
-              onChange={e => setFormData({ ...formData, link: e.target.value })}
+            <Input
+              label="Link to the clip"
+              placeholder="https://drive.google.com/..."
+              value={form.link}
+              onChange={(e) => setForm({ ...form, link: e.target.value })}
               required
+              error={form.link && warning ? warning : undefined}
             />
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Skill Category *</label>
-              <select 
-                value={formData.category}
-                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                required
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand"
+              <label htmlFor="tc-cat" className="text-[13px] font-medium text-ink-muted">Which skill does it show?</label>
+              <select
+                id="tc-cat"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink
+                           focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 transition-all"
               >
-                <option value="" disabled className="bg-background">Select Category</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat} className="bg-background">{cat}</option>
-                ))}
+                {CATEGORIES.map((c) => <option key={c} value={c} className="bg-elevated">{c}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Why this is your best (Optional)</label>
+              <label htmlFor="tc-why" className="text-[13px] font-medium text-ink-muted">Why is this one of your best?</label>
               <textarea
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand min-h-[80px]"
-                placeholder="e.g. This goal shows my shooting power and composure..."
-                value={formData.whyBest}
-                onChange={e => setFormData({ ...formData, whyBest: e.target.value })}
+                id="tc-why"
+                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink placeholder:text-ink-faint
+                           focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 min-h-[88px] transition-all"
+                placeholder="e.g. Shows my shooting power and that I stay calm under pressure."
+                value={form.whyBest}
+                onChange={(e) => setForm({ ...form, whyBest: e.target.value })}
               />
             </div>
-            <div className="pt-4 flex justify-end gap-3">
-              <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-              <Button type="submit">{editingItem ? 'Save Changes' : 'Add Clip'}</Button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <Button type="submit">{editingId ? 'Save changes' : 'Add clip'}</Button>
             </div>
           </form>
         </Modal>
       )}
-    </GlassCard>
+
+      {dialog}
+    </SectionShell>
   );
 }
