@@ -90,6 +90,7 @@ advice is scheduled, not ignored:
   passport — possession of one bypasses the rules; restrict filenames and object counts; treat
   the browser-reported MIME type as untrusted.
 - **Checkpoint 2:** rule tests on the Firebase emulator, which needs `firebase-tools` installed.
+  — DONE in checkpoint 2: `rules-tests/`, 46 tests, all passing.
 - **Operational:** MFA on the admin account, and a retention/deletion policy once identity
   documents exist.
 
@@ -129,11 +130,93 @@ Rules changes belong in this file and reach the console only as a paste of it.
 
 ---
 
-## Checkpoint 2 — the rest of the fixes and what the app is missing (next)
+## Checkpoint 2 — the rest of the fixes, and what the app was missing (2026-09-09) ✅ DONE
 
-Planned: change email / position / name, an activity trail so it is visible who has gone quiet,
-offline tolerance, a player-facing export, and the remaining items from `AUDIT_2026-09-08.md` §4.
-Then a Codex review for what else would make it more effective.
+**What this stage was for:** checkpoint 1 made the app safe. This one makes it usable. Everything
+here is from `AUDIT_2026-09-08.md` §4 — the things a player or an admin would simply expect and
+that were not there.
+
+### Done
+
+**Offline tolerance** (§4: "a player on stadium wifi loses what he typed")
+- Firestore now keeps an IndexedDB cache (`persistentLocalCache` + `persistentMultipleTabManager`
+  in `services/firebase.js`). A write goes to the device first and is sent when the connection
+  returns, even if he closes the tab and comes back tomorrow.
+- `hooks/useOnlineStatus.js` drives an honest header pill: offline reads
+  "Offline — saved on this device", not a "Saving…" that never finishes, and the dashboard
+  explains what is happening in a sentence.
+- Multi-tab is deliberate: he has the hub open on his phone and his laptop.
+
+**Account settings** — new page at `/account`, reached from the header menu
+- Change full name and main position. Changing between goalkeeper and outfield says plainly that
+  the skill categories differ and that nothing already added is deleted.
+- Change the sign-in email through `verifyBeforeUpdateEmail`: the link goes to the NEW address and
+  the change happens only when he clicks it. A typo therefore cannot lock him out, nobody can move
+  an account to an address they do not control, and it is the only variant that still works with
+  email-enumeration protection on. `profile.email` catches up on his next sign-in.
+- Change password, with re-authentication first.
+
+**Activity trail** (§4: "you cannot see when he last touched it, so 'is he working?' is a guess")
+- Two different facts, kept apart on purpose: `updatedAt` (he ADDED something) and
+  `profile.lastSeenAt` (he OPENED it), the second throttled to once an hour per device.
+- The admin list shows the later of the two per row, counts how many have been quiet for a
+  fortnight, and sorts by quietest first. A player who signs in daily and adds nothing reads
+  "Opened yesterday, added nothing in 20 days" — a different problem from one who has vanished.
+- `profile.lastSeenAt` lives INSIDE `profile` so no rules change was needed; a new top-level
+  field would have been refused by `ownedKeysOnly()`.
+
+**Export** (§4: "no export for the player")
+- `utils/export.js`: a readable **link sheet** (every link grouped by section, with what is still
+  missing at the bottom) and the **raw JSON**. Both on the player's account page.
+- The same link sheet is on the admin's player page, plus copy-to-clipboard. This is the file that
+  gets forwarded to the editor, and it replaces copying links out one at a time.
+
+**Nudges** (§4: "nothing tells a player he is in week 5 with 4 clips")
+- A "Do this next" card: ONE instruction, in the order the footage guide actually needs things
+  (an editor cannot cut a reel from photos), and a button that scrolls to it. It states the week
+  he is in and invents no deadline, because the app does not know his.
+
+**Phone** (§4: "no sticky bottom navigation")
+- `SectionNav`: a sticky bottom bar on phones only, jumping to each of the five sections and
+  showing which are complete. The rest of the mobile work was done in checkpoint 1.
+
+**Admin can fix a record**
+- Name and position, from the player's page. NOT the email: that is his Firebase Auth identity,
+  and editing the copy on the record would only make the two disagree.
+
+**Housekeeping that came with it**
+- `utils/catalog.js`: positions, skill categories and photo types were written out separately in
+  three components and the export would have been a fourth. One source of truth now.
+- Dropped the unused Firebase Storage SDK (nothing uploads until checkpoint 3) and split the admin
+  and account routes out of the first download.
+- Fixed "8 of 23 pieces in" — a sentence that stopped mid-air, introduced in checkpoint 1.
+
+**Rule tests — the security is now proved, not asserted** (carried over from checkpoint 1's list)
+- `rules-tests/` runs `firestore.rules` against the Firestore emulator: **46 tests, all passing**.
+  `npm test` in that folder starts the emulator itself. It needs Java, which is installed.
+- What they prove: a stranger reads and writes nothing; a player cannot read another record,
+  list the collection, query for someone else, store a `password` or `role`, write coach notes,
+  add an unknown field, reassign `authUid`, delete his record, or make himself an admin; a fresh
+  account can create only its own record and only with the expected fields; the coach can read
+  everything and clean an old record but cannot put a password back, move ownership, delete a
+  record, or appoint an admin; every other collection is closed to everyone.
+- One test exists specifically to catch a silent failure: the activity trail writes the dotted
+  path `profile.lastSeenAt`, and if `affectedKeys()` reported that as `profile.lastSeenAt` rather
+  than `profile`, the rules would refuse it and the trail would quietly stop working in
+  production while looking fine in the code. It passes.
+
+### Verified
+- Build and lint clean (0 errors, 2 known fast-refresh warnings on the two context files).
+- The pure logic — completion, next step, activity, link sheet, raw JSON — run against a
+  realistic record and against an empty one: correct output, nothing throws.
+- The dashboard and account screens rendered and driven through a throwaway harness (desktop and
+  375px): section anchors resolve, the jump scrolls, the goalkeeper warning fires, the export
+  button runs without error, no console errors. The harness was removed again.
+- Not verified end-to-end signed in: that needs a real account, and creating one is Panos's to do.
+
+### Deliberately not done
+- Submit-for-review and approve / needs-redo — Panos dropped them; feedback goes through Skool.
+- Deadlines. The app does not know a player's, and a made-up one is worse than none.
 
 ## Checkpoint 3 — the hub
 

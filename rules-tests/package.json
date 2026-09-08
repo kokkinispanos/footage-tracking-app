@@ -1,0 +1,16 @@
+{
+  "name": "player-hub-rules-tests",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Proof that firestore.rules does what the README says it does.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project footage-tracker \"node rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^14.9.0"
+  },
+  "comment": "firebase is pinned to 11 here because @firebase/rules-unit-testing requires it. The app itself uses 12. Rules are enforced server-side, so the client SDK version does not change what is being tested."
+}

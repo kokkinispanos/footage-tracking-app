@@ -22,19 +22,24 @@ firestore.rules          THE SECURITY OF THE APP. Read this before changing anyt
 storage.rules            Passport / CV / headshot uploads: owner and admin only.
 firebase.json            So `firebase deploy --only firestore:rules` works if the CLI is installed.
 MIGRATION.md             The console steps to switch sign-in on and close the database.
+rules-tests/             46 tests that PROVE firestore.rules does what it says. `npm test`.
 AUDIT_2026-09-08.md      Where this all came from: what was broken and what is planned.
 frontend/
   dev.mjs                Starts Vite with the right working directory (the path has spaces).
   src/
-    services/firebase.js   The Firebase handles. The config in it is public by design.
+    services/firebase.js   The Firebase handles + the on-device cache that makes it work offline.
     services/auth.js       WHO the user is. Passwords never come near our database.
     services/db.js         The player's RECORD. Found by authUid, never by email.
     context/AuthContext     The signed-in user, from Firebase on every load.
     context/PlayerContext   The record, kept live with onSnapshot, saved one section at a time.
-    utils/completion.js     ONE completion formula, shared by the player and the admin.
+    hooks/useOnlineStatus   Whether to tell him he is offline. Never used to decide what to save.
+    utils/catalog.js        Positions, skill categories, photo types. ONE source of truth.
+    utils/completion.js     ONE completion formula + the single "do this next" instruction.
+    utils/activity.js       When he last added something, and when he last just looked.
+    utils/export.js         The link sheet for the editor, and his raw data.
     utils/links.js          Link tidying and the mistakes we can actually catch.
-    pages/                  Login, SignUp, ForgotPassword, Dashboard, Admin*
-    components/dashboard/   The five footage sections + the shared shell and row
+    pages/                  Login, SignUp, ForgotPassword, Dashboard, Account, Admin*
+    components/dashboard/   The five footage sections + next-step card, phone nav, shell, row
     components/ui/          Buttons, inputs, cards, modal, brand marks
 ```
 
@@ -54,6 +59,19 @@ Vercel builds `frontend/`.
 
 **Rules are not deployed by a push.** They live in the Firebase console. See `MIGRATION.md`.
 
+## Testing the rules
+
+```bash
+cd rules-tests
+npm install
+npm test
+```
+
+Starts the Firestore emulator (needs Java), runs `firestore.rules` against 46 cases and exits
+non-zero if any of them lets something through. **Run this before changing the rules and after.**
+The rules are the only thing standing between a signed-in player and everyone else's data; a
+comment saying they work is not evidence.
+
 ## The two rules that matter when you change anything
 
 1. **The security is `firestore.rules`, not the React code.** Any check written only in the
@@ -63,6 +81,19 @@ Vercel builds `frontend/`.
    or YouTube links — they are gigabytes, and the editor needs to open them in Drive anyway.
    Passports, CVs and headshots are real uploads into Firebase Storage, because an identity
    document must never be a public URL.
+
+## Three things that look odd until you know why
+
+- **`updatedAt` and `profile.lastSeenAt` are separate.** The first means he added something, the
+  second that he opened the app. "He looks every day and adds nothing" and "he has vanished" are
+  different problems and the admin list distinguishes them. Opening the app must never count as
+  progress.
+- **`profile.lastSeenAt` lives inside `profile`.** It would read better as a top-level field, but
+  the rules only let a player write the named sections — a new top-level key would be refused.
+  Nested keeps it legal without redeploying rules.
+- **Changing an email uses `verifyBeforeUpdateEmail`, not `updateEmail`.** The confirmation goes
+  to the new address, so a typo cannot lock a player out of his own account. It is also the only
+  variant that still works with email-enumeration protection switched on.
 
 ## Who is an admin
 
