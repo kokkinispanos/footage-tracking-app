@@ -22,6 +22,8 @@ import { auth, db } from './firebase';
 /** Firebase's error codes are not sentences. Turn them into something a tired person understands. */
 export function readableAuthError(err) {
   const code = err?.code || '';
+  // The player sees plain words; whoever is debugging still gets the real thing.
+  if (import.meta.env?.DEV) console.warn('[auth]', code, err);
   switch (code) {
     case 'auth/invalid-email':
       return 'That does not look like an email address.';

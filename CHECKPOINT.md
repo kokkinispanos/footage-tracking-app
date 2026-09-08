@@ -25,6 +25,8 @@ player records, passwords in plain text included. Nothing else could be built un
 - A player is found by `authUid`, never by email. The email lookup is what made every record
   readable in the first place.
 - New: **Forgot password** page, and an email verification banner with a resend.
+- Every Firebase error code is turned into a plain sentence. A player never sees a code; the raw
+  error still goes to the console in development.
 
 **The rules (the actual security)**
 - `firestore.rules` (new): a player reads and writes only his own record, and only the sections
