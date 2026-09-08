@@ -30,6 +30,9 @@ export function PlayerProvider({ children }) {
   const dirtyRef = useRef(new Set());
   const timersRef = useRef({});
   const latestRef = useRef(null);
+  // How many edits each section has had. A save that finishes after a newer edit has
+  // started must not report itself as the current one — see updateSection.
+  const editSeqRef = useRef({});
 
   // 1. Find his document: id = auth uid for new records, an older uuid for legacy ones.
   useEffect(() => {
@@ -55,6 +58,10 @@ export function PlayerProvider({ children }) {
   useEffect(() => {
     if (!docId) return undefined;
 
+    // The Set is never replaced, only emptied — captured here so the cleanup is not reading
+    // a ref at teardown time, which is the thing the exhaustive-deps rule warns about.
+    const dirty = dirtyRef.current;
+
     const unsubscribe = onSnapshot(
       doc(db, 'players', docId),
       (snap) => {
@@ -66,7 +73,7 @@ export function PlayerProvider({ children }) {
             return remote;
           }
           const merged = { ...remote };
-          for (const key of dirtyRef.current) merged[key] = local[key];
+          for (const key of dirty) merged[key] = local[key];
           latestRef.current = merged;
           return merged;
         });
@@ -78,6 +85,11 @@ export function PlayerProvider({ children }) {
       unsubscribe();
       setData(null);
       latestRef.current = null;
+      // A different record (or none) is about to load: the old one's dirty marks and edit
+      // counters mean nothing now. Timers already in flight still finish against the docId
+      // they captured, which is what we want — an unsaved edit should still reach the server.
+      dirty.clear();
+      editSeqRef.current = {};
     };
   }, [docId]);
 
@@ -154,6 +166,10 @@ export function PlayerProvider({ children }) {
     dirtyRef.current.add(sectionKey);
     setSaveStatus('saving');
 
+    // Stamp this edit. Everything below compares against it when the write comes back.
+    const seq = (editSeqRef.current[sectionKey] || 0) + 1;
+    editSeqRef.current[sectionKey] = seq;
+
     setData((prev) => {
       if (!prev) return prev;
       const next = { ...prev, [sectionKey]: updaterFn(prev[sectionKey]) };
@@ -166,6 +182,14 @@ export function PlayerProvider({ children }) {
       const value = latestRef.current?.[sectionKey];
       try {
         await dbService.savePlayerSections(docId, { [sectionKey]: value });
+
+        // He kept typing while this write was in the air. Do NOT clear the dirty flag or
+        // the timer handle: the flag is the only thing stopping the snapshot for THIS
+        // write — which carries the older value — from landing on top of what he has
+        // typed since, and the handle is what the pagehide flush uses to push the newer
+        // edit if he closes the tab. Clearing either here silently loses the newer edit.
+        if (editSeqRef.current[sectionKey] !== seq) return;
+
         dirtyRef.current.delete(sectionKey);
         delete timersRef.current[sectionKey];
         if (dirtyRef.current.size === 0) {
