@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { UPLOAD_SLOTS, MAX_FILE_BYTES, MAX_PDF_BYTES, MAX_STORED_CHARS } from '../utils/hubCatalog';
 
 /**
@@ -112,8 +112,10 @@ export const fileService = {
    * Save one file. Photos are shrunk first. Returns what the player's record should hold:
    * the name, size and date, and nothing that could be used to reach the file from outside.
    */
-  async upload(uid, slot, file, onProgress) {
-    if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
+  async upload({ uid, slot, file, playerDocId, claimPath, onProgress }) {
+    if (!uid || !playerDocId) {
+      throw new Error('We do not know who you are yet. Reload the page and try again.');
+    }
     if (!UPLOAD_SLOTS[slot]) throw new Error(`Unknown slot "${slot}"`);
 
     const problem = fileProblem(file, slot);
@@ -136,36 +138,65 @@ export const fileService = {
       );
     }
 
-    onProgress?.(60);
-    await setDoc(doc(db, 'playerFiles', fileDocId(uid, slot)), {
-      ownerUid: uid,
-      slot,
-      name: file.name.slice(0, 120),
-      type: isImage ? 'image/jpeg' : file.type,
-      data,
-      savedAt: serverTimestamp(),
-    });
-    onProgress?.(100);
-
-    return {
+    const claim = {
       name: file.name.slice(0, 120),
       // The stored size, not the original: this is what he would get back.
       size: Math.round((data.length * 3) / 4),
       type: isImage ? 'image/jpeg' : file.type,
       uploadedAt: new Date().toISOString(),
     };
+
+    onProgress?.(60);
+    // ONE batch, so the file and the record that points at it cannot disagree. Two writes
+    // meant a dropped connection between them could leave a passport stored with nothing
+    // pointing at it, which is a file nobody can see to delete.
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'playerFiles', fileDocId(uid, slot)), {
+      ownerUid: uid,
+      slot,
+      name: claim.name,
+      type: claim.type,
+      data,
+      savedAt: serverTimestamp(),
+    });
+    batch.update(doc(db, 'players', playerDocId), {
+      [claimPath]: claim,
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
+    onProgress?.(100);
+
+    return claim;
   },
 
-  async remove(uid, slot) {
-    await deleteDoc(doc(db, 'playerFiles', fileDocId(uid, slot)));
+  /**
+   * Delete the file and the claim together.
+   *
+   * The other way round, a dropped connection between the two writes leaves either a
+   * passport nobody can see to delete, or a record swearing to a file that is gone. For an
+   * identity document neither is acceptable, so it is one batch or nothing.
+   */
+  async remove({ uid, slot, playerDocId, claimPath }) {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'playerFiles', fileDocId(uid, slot)));
+    batch.update(doc(db, 'players', playerDocId), {
+      [claimPath]: null,
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
   },
 
   /**
    * Read a file back for viewing.
    *
-   * The data URL comes straight out of Firestore. Nothing is minted, nothing is shareable,
-   * and the rules were consulted on the way. `null` means the record claims a file that is
-   * not actually there, which the caller says out loud rather than hiding.
+     * The bytes come straight out of Firestore, so the rules were consulted on the way and no
+   * link is left behind that would work later or for anyone else.
+   *
+   * Being precise about what that does and does not mean: the value returned IS the file, as
+   * a `data:` URL. Anyone already allowed to see it could copy that string, exactly as they
+   * could screenshot it or save it. The property being defended is narrower and is the one
+   * that matters: no durable URL exists that keeps working for someone who was never allowed
+   * to look. `null` means the record claims a file that is not there.
    */
   async open(uid, slot) {
     if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
@@ -174,14 +205,20 @@ export const fileService = {
     return { data: snap.data().data, type: snap.data().type };
   },
 
-  /** Does the file really exist? The coach's page uses this to catch a record that lies. */
+  /**
+   * Does the file really exist?
+   *
+   * Three answers, not two: true, false, and `null` for "could not tell". A dropped
+   * connection is not evidence that a player's passport is missing, and telling the coach it
+   * is would send him chasing something that is actually there.
+   */
   async exists(uid, slot) {
-    if (!uid) return false;
+    if (!uid) return null;
     try {
       const snap = await getDoc(doc(db, 'playerFiles', fileDocId(uid, slot)));
       return snap.exists();
     } catch {
-      return false;
+      return null;
     }
   },
 };

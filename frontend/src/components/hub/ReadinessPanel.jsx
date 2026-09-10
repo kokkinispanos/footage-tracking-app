@@ -23,7 +23,7 @@ const CLAIMS = [
 ];
 
 export function ReadinessPanel({ record }) {
-  const state = readiness(record);
+  const claimed = readiness(record);
 
   /**
    * Does the file the record claims actually exist?
@@ -34,6 +34,7 @@ export function ReadinessPanel({ record }) {
    */
   const [ghosts, setGhosts] = useState([]);
   const uid = record?.authUid;
+  const hint = eligibilityHint(record);
 
   // A plain string of what is claimed, so the check re-runs when the claims change and NOT
   // on every snapshot. `record` is a fresh object each time and would re-read four documents
@@ -43,17 +44,32 @@ export function ReadinessPanel({ record }) {
   useEffect(() => {
     if (!uid) return undefined;
     let cancelled = false;
-    const claimed = CLAIMS.filter((c) => claimKey.includes(`${c.slot}:`) && getIn(record, c.path, ''));
+    const toCheck = CLAIMS.filter((c) => getIn(record, c.path, ''));
 
-    Promise.all(claimed.map(async (c) => ({ ...c, there: await fileService.exists(uid, c.slot) })))
-      .then((checked) => { if (!cancelled) setGhosts(checked.filter((c) => !c.there)); })
+    Promise.all(toCheck.map(async (c) => ({ ...c, there: await fileService.exists(uid, c.slot) })))
+      // `there === null` means the check itself failed. A dropped connection is not evidence
+      // that a passport is missing, so only a definite "no" counts.
+      .then((checked) => { if (!cancelled) setGhosts(checked.filter((c) => c.there === false)); })
       .catch(() => { /* a failed check is not evidence of anything */ });
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, claimKey]);
 
-  const hint = eligibilityHint(record);
+  // A file that is not there does not count, whatever the record says. Without this the
+  // panel could say "you can start his campaign" in green while warning underneath that his
+  // passport is missing, and the green is the bit people act on.
+  const ghostKeys = new Set(ghosts.map((g) => g.slot === 'cv' ? 'cv' : g.slot === 'headshot' ? 'headshot' : 'passportScan'));
+  const items = claimed.items.map((i) => (ghostKeys.has(i.key) ? { ...i, ok: false } : i));
+  const missing = items.filter((i) => !i.ok);
+  const state = {
+    items,
+    missing,
+    ready: missing.length === 0,
+    done: items.length - missing.length,
+    total: items.length,
+  };
+
   const passport = getIn(record, ['identity', 'passportOne', 'country']);
   const second = getIn(record, ['identity', 'passportTwo', 'country']);
   const family = getIn(record, ['identity', 'euFamily', 'has']);

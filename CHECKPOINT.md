@@ -355,7 +355,7 @@ a phone gives up. The phone bar shows the five of whichever tab he is on.
   take the whole player list down. **`firestore.rules` needs republishing.**
 - `storage.rules` rewritten from `{allPaths=**}` to the four named slots. **Needs publishing,
   and Storage needs switching on at all.**
-- Rule tests: **76, all passing**, including that a hub section cannot be a string or a list,
+- Rule tests: **93, all passing**, including that a hub section cannot be a string or a list,
   that the coach can tick a sign-off and set the proof page, and that a player still cannot
   touch another player's hub sections.
 
@@ -425,6 +425,52 @@ once uploads have run for real.
 - The CV generator. That is checkpoint 4 and it is a tool for Panos, not something a player
   needs.
 - "Send to Stage 3". Parked until the app has been used in anger.
+
+## Checkpoint 3b — no Firebase Storage, and the final review (2026-09-10) ✅ DONE
+
+**Firebase Storage needs the paid Blaze plan.** Panos declined, so the uploads were rebuilt to
+store each file inside Firestore: shrunk on the player's own phone, one document per file at
+`playerFiles/<uid>__<slot>`. `storage.rules` is deleted and `firebase.json` trimmed.
+
+This is the better design, not a workaround. A Storage download link carries its own access
+token and keeps working for anyone who ever sees it, whatever the rules say afterwards, which is
+exactly the wrong property for a teenager's passport. A Firestore document has no link, so the
+rules are consulted on every read.
+
+Measured, not assumed: a passport page stores at **185 KB** and stays readable at 1600x1200, and
+an 11 MB photo of pure random noise, the worst case JPEG can face, still lands at 634 KB. A PDF
+cannot be shrunk, so a CV over 640 KB asks for a link instead.
+
+**The final Codex review said NO-GO, and two of its findings were serious:**
+- **A failed delete could leave a passport stored with nothing pointing at it** and therefore no
+  button anywhere to remove it. The record was cleared first and the file second.
+- **A failed upload could leave the same orphan** the other way round.
+  Both are now **one Firestore batch**: either the file and the claim both land, or neither does.
+- **`updatedAt` could be written on its own**, so a player could look busy on the coach's list
+  without adding anything. It may now only move when a section he owns, or one of the coach's
+  own fields, moved with it.
+- **A missing file did not make readiness false.** The panel warned underneath while still
+  saying "you can start his campaign" in green, and the green is the part people act on.
+- **A failed existence check was reported as a missing file.** `exists()` answers true, false or
+  null now, and only a definite no counts against a player.
+- **The pagehide flush never cleared its dirty marks**, so a player who switched apps and came
+  back would silently ignore updates from his other device until he typed again.
+- Corrected an overclaim of my own: the viewer returns the file as a `data:` URL, which IS the
+  file. Anyone already allowed to see it could copy it, exactly as they could screenshot it. The
+  property actually being defended is narrower and is the one that matters: no durable URL
+  exists that keeps working for someone who was never allowed to look.
+
+**Left, with reasons:** the rules check that `identity`, `deliverables` and the rest are maps but
+not what is inside them, so a player can still write a fake date of birth or claim a file he has
+not uploaded. The first is self-defeating and the coach checks the passport himself; the second
+is now caught by the readiness panel. Full nested schema validation in rules is a lot of surface
+for a small gain, and is the obvious next hardening if this ever holds more than a few players.
+
+`npm test` in `rules-tests/` now frees the emulator port before running, because an interrupted
+run used to leave Java holding 8080 and the next run failed in a way that looked like a broken
+suite. **93 rule tests, all passing.**
+
+---
 
 ## Checkpoint 4 — the CV generator
 

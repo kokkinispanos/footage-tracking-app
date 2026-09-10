@@ -43,6 +43,8 @@ function prettySize(bytes) {
 export function FileSlot({
   slot,
   uid,
+  playerDocId,
+  claimPath,      // the full dotted path on the record, e.g. "identity.passportOne.file"
   label,
   hint,
   value,          // { name, size, type, uploadedAt } or nothing
@@ -80,10 +82,14 @@ export function FileSlot({
     // leaving him looking at a bar that has stopped.
     const slowTimer = setTimeout(() => setSlow(true), 12000);
     try {
-      const saved = await fileService.upload(uid, slot, file, setPercent);
-      // Awaited on purpose. The file is saved now; until the record says so the two disagree,
-      // and he would be looking at a screen that has forgotten what he just did.
-      await onChange(saved);
+      // One batch writes the file AND the claim on the record, so they cannot end up
+      // disagreeing. `onChange` afterwards is only to keep the copy in memory in step: if
+      // this section has an unsaved edit in it, the pending save would otherwise write a
+      // version of the section that predates the upload and wipe the claim straight back off.
+      const saved = await fileService.upload({
+        uid, slot, file, playerDocId, claimPath, onProgress: setPercent,
+      });
+      onChange(saved);
     } catch (err) {
       if (mountedRef.current) setError(readableUploadError(err));
     } finally {
@@ -102,11 +108,11 @@ export function FileSlot({
     setError('');
     setBusy(true);
     try {
-      // Record first, file second. If the second half fails we are left with a file nobody
-      // points at, which is tidy-up. The other order leaves the record claiming a file that
-      // is gone, which is a lie the coach acts on.
-      await onChange(null);
-      await fileService.remove(uid, slot);
+      // Both halves in one batch. Either the passport and the claim both go, or neither
+      // does. Doing it in two writes meant a dropped connection could leave a passport
+      // stored with nothing pointing at it, and no button anywhere to delete it.
+      await fileService.remove({ uid, slot, playerDocId, claimPath });
+      onChange(null);
     } catch (err) {
       if (mountedRef.current) setError(readableUploadError(err));
     } finally {

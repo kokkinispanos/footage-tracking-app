@@ -5,7 +5,8 @@
   "version": "1.0.0",
   "description": "Proof that firestore.rules does what the README says it does.",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project footage-tracker \"node rules.test.mjs\""
+    "pretest": "node free-port.mjs",
+    "test": "firebase emulators:exec --only firestore --project footage-tracker --config ../firebase.json \"node rules.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

@@ -24,10 +24,11 @@ const TONE_BOX = {
  * and we say why.
  */
 export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNotes, index = 6 }) {
-  const { data, set, setPath, setPathNow, readOnly } = useHubSection('identity', { adminMode, overrideData });
+  const { data, set, setPath, readOnly } = useHubSection('identity', { adminMode, overrideData });
   const context = usePlayer();
   const record = adminMode ? overrideData : context.playerData;
   const uid = record?.authUid || record?.id;
+  const playerDocId = record?.id;
 
   const hint = eligibilityHint(record);
   const hasSecond = !!(getIn(data, ['passportTwo', 'country']) || getIn(data, ['passportTwo', 'file', 'name'], ''));
@@ -93,10 +94,12 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
         <FileSlot
           slot="passportOne"
           uid={uid}
+          playerDocId={playerDocId}
+          claimPath="identity.passportOne.file"
           label="Photo of your passport"
           hint="Take a photo of the page with your face on it. Make sure you can read it. Only you and your coach can ever see it."
           value={getIn(data, ['passportOne', 'file'], null)}
-          onChange={(file) => setPathNow(['passportOne', 'file'], file)}
+          onChange={(file) => setPath(['passportOne', 'file'], file)}
           readOnly={readOnly}
         />
       </div>
@@ -129,10 +132,12 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
             <FileSlot
               slot="passportTwo"
               uid={uid}
+              playerDocId={playerDocId}
+              claimPath="identity.passportTwo.file"
               label="Photo of your second passport"
               hint="Same again. The page with your face on it."
               value={getIn(data, ['passportTwo', 'file'], null)}
-              onChange={(file) => setPathNow(['passportTwo', 'file'], file)}
+              onChange={(file) => setPath(['passportTwo', 'file'], file)}
               readOnly={readOnly}
             />
           )}

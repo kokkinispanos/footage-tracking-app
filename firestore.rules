@@ -207,7 +207,14 @@ service cloud.firestore {
       // this passes for every honest write and refuses a made-up one.
       function updatedAtOk() {
         return !('updatedAt' in request.resource.data.diff(resource.data).affectedKeys())
-          || request.resource.data.updatedAt == request.time;
+          || (request.resource.data.updatedAt == request.time
+              // AND something he owns actually changed. Otherwise a player could write
+              // nothing but a fresh timestamp, over and over, and read as busy on the
+              // coach's list without ever adding a clip.
+              // A section the player owns, or one of the coach's own fields. Not on its
+              // own, which is the case this exists to refuse.
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasAny(sectionKeys().concat(coachKeys())));
       }
 
       // What an admin may change: the sections (so he can repair a record and carry an old

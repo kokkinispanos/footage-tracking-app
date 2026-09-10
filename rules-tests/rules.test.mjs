@@ -370,6 +370,9 @@ await check('the player can still save his own sections with a sign-off in place
 
 section('The clock the coach reads');
 
+await check('a player cannot bump updatedAt on its own to look busy', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { updatedAt: serverTimestamp() })));
+
 await check('a player cannot hand-write updatedAt into the future', () =>
   assertFails(updateDoc(doc(a, 'players', PLAYER_A), {
     fullGames: [], updatedAt: new Date(Date.now() + 400 * 86400000),
@@ -417,17 +420,20 @@ await check('a hub section cannot be a list', () =>
 await check('a player still cannot touch another player hub sections', () =>
   assertFails(updateDoc(doc(b, 'players', PLAYER_A), { identity: { dateOfBirth: '2000-01-01' } })));
 
-await check('the coach can tick the reel sign-off on a player record', () =>
-  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
-    'deliverables.highlightReel.approvedByCoach': { done: true, at: '2026-09-10T00:00:00.000Z' },
+// The coach's two values used to live inside `deliverables`, which the player owns. They are
+// under `coachSignOff` now (see the section below). Nothing reads the old paths any more, so a
+// player writing them achieves nothing, but the app must not read them again by accident.
+await check('the old in-section coach paths are dead weight, not authority', async () => {
+  const before = JSON.stringify((await getDoc(doc(a, 'players', PLAYER_A))).data().coachSignOff ?? null);
+  // He is allowed to write inside his own `deliverables`. The point is that doing so must
+  // not reach the coach's field, which is where everything actually reads from.
+  await assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    'deliverables.highlightReel.approvedByCoach': { done: true, at: 'whenever' },
     updatedAt: serverTimestamp(),
-  })));
-
-await check('the coach can set the proof page link', () =>
-  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
-    'deliverables.proofPage.link': 'https://proplacement.cloud/p/matt',
-    updatedAt: serverTimestamp(),
-  })));
+  }));
+  const after = JSON.stringify((await getDoc(doc(a, 'players', PLAYER_A))).data().coachSignOff ?? null);
+  if (before !== after) throw new Error('writing the old path changed coachSignOff');
+});
 
 // ============================================================ signing up
 section('A brand-new account creating its record');

@@ -62,10 +62,11 @@ function SignOff({ label, done, at, canTick, onToggle, waitingText }) {
  * in and the first thing a club actually looks at.
  */
 export function SectionDeliverables({ adminMode, overrideData, adminDocId, adminNotes, index = 9 }) {
-  const { data, setPath, setPathNow, readOnly } = useHubSection('deliverables', { adminMode, overrideData });
+  const { data, setPath, readOnly } = useHubSection('deliverables', { adminMode, overrideData });
   const context = usePlayer();
   const record = adminMode ? overrideData : context.playerData;
   const uid = record?.authUid || record?.id;
+  const playerDocId = record?.id;
 
   const [editingReel, setEditingReel] = useState(false);
   const [reelDraft, setReelDraft] = useState('');
@@ -174,10 +175,12 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         <FileSlot
           slot="cv"
           uid={uid}
+          playerDocId={playerDocId}
+          claimPath="deliverables.cv.file"
           label="Your CV"
           hint="A PDF, up to 640 KB. The one we sent you, or your own if you already had one."
           value={getIn(data, ['cv', 'file'], null)}
-          onChange={(file) => setPathNow(['cv', 'file'], file)}
+          onChange={(file) => setPath(['cv', 'file'], file)}
           readOnly={readOnly}
         />
 
@@ -235,10 +238,12 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
       <FileSlot
         slot="headshot"
         uid={uid}
+        playerDocId={playerDocId}
+        claimPath="deliverables.headshot.file"
         label="Your best photo"
         hint="Head and shoulders, good light, looking at the camera. This goes on your player page."
         value={getIn(data, ['headshot', 'file'], null)}
-        onChange={(file) => setPathNow(['headshot', 'file'], file)}
+        onChange={(file) => setPath(['headshot', 'file'], file)}
         readOnly={readOnly}
       />
 

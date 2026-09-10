@@ -110,6 +110,9 @@ export function PlayerProvider({ children }) {
         if (docId && value !== undefined) {
           dbService.savePlayerSections(docId, { [key]: value }).catch(() => {});
         }
+        // The mark has to go too. He switches apps, comes back an hour later, and until he
+        // types again this section would keep refusing every update from his other device.
+        dirtyRef.current.delete(key);
       }
       timersRef.current = {};
     };
@@ -177,28 +180,6 @@ export function PlayerProvider({ children }) {
     dbService.updateProfileFields(docId, { email: real }, { touch: false })
       .catch(() => { emailSyncedRef.current = null; });   // let a failed write try again
   }, [docId, user?.email, data?.profile]);
-
-  /**
-   * Write one nested value NOW, with no debounce, and wait for it.
-   *
-   * For things that happen once rather than being typed. An upload is the case that matters:
-   * the file is already in Storage, and until the record says so the two disagree. Through
-   * the debounce that window is 700ms plus a round trip, and closing the tab inside it leaves
-   * them disagreeing for good.
-   */
-  const savePathNow = useCallback(async (sectionKey, path, value) => {
-    if (!PLAYER_OWNED_KEYS.includes(sectionKey)) return;
-    if (!docId) return;
-    setSaveStatus('saving');
-    try {
-      await dbService.savePlayerPath(docId, [sectionKey, ...path].join('.'), value);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus((s) => (s === 'saved' ? 'idle' : s)), 2000);
-    } catch (err) {
-      setSaveStatus('error');
-      throw err;
-    }
-  }, [docId]);
 
   /** Name, position or email. Returns nothing; the snapshot brings the new value back. */
   const saveProfile = useCallback(async (fields) => {
@@ -270,7 +251,6 @@ export function PlayerProvider({ children }) {
       notFound,
       saveStatus,
       updateSection,
-      savePathNow,
       saveProfile,
     }}>
       {children}
