@@ -270,6 +270,56 @@ await check('a properly shaped write still goes through', () =>
     'profile.fullName': 'A Real Name', updatedAt: serverTimestamp(),
   })));
 
+section('What only the coach may say');
+
+await check('a player cannot tick his own coach sign-off', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), {
+    'coachSignOff.reelApproved': { done: true, at: '2026-09-10T00:00:00.000Z' },
+  })));
+
+await check('a player cannot set the proof page clubs are sent to', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), {
+    'coachSignOff.proofPageLink': 'https://evil.example.com',
+  })));
+
+await check('a player cannot replace the whole coach block', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { coachSignOff: {} })));
+
+await check('the coach CAN sign off the reel', () =>
+  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
+    'coachSignOff.reelApproved': { done: true, at: '2026-09-10T00:00:00.000Z' },
+    updatedAt: serverTimestamp(),
+  })));
+
+await check('the coach CAN set the proof page', () =>
+  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
+    'coachSignOff.proofPageLink': 'https://proplacement.cloud/p/matt',
+    updatedAt: serverTimestamp(),
+  })));
+
+await check('the player can still save his own sections with a sign-off in place', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    deliverables: { highlightReel: { link: 'https://youtu.be/mine' } },
+    updatedAt: serverTimestamp(),
+  })));
+
+section('The clock the coach reads');
+
+await check('a player cannot hand-write updatedAt into the future', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), {
+    fullGames: [], updatedAt: new Date(Date.now() + 400 * 86400000),
+  })));
+
+await check('a player cannot backdate updatedAt either', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), {
+    fullGames: [], updatedAt: new Date(2020, 0, 1),
+  })));
+
+await check('the real server timestamp is accepted', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    fullGames: [], updatedAt: serverTimestamp(),
+  })));
+
 section('The hub sections');
 
 await check('he can fill in who he is', () =>
@@ -324,19 +374,23 @@ await check('creates its own record with the expected fields', () =>
   })));
 
 await check('cannot create a record under someone else id', () =>
-  assertFails(setDoc(doc(fresh, 'players', 'somebodyElse'), blankRecord('somebodyElse'))));
+  assertFails(setDoc(doc(fresh, 'players', 'somebodyElse'), {
+    ...blankRecord('somebodyElse'), updatedAt: serverTimestamp(),
+  })));
 
 await check('cannot create a record claiming another authUid', () =>
-  assertFails(setDoc(doc(fresh, 'players', FRESH), blankRecord(PLAYER_B))));
+  assertFails(setDoc(doc(fresh, 'players', FRESH), {
+    ...blankRecord(PLAYER_B), updatedAt: serverTimestamp(),
+  })));
 
 await check('cannot create a record carrying a password', () =>
   assertFails(setDoc(doc(fresh, 'players', 'freshTwo'), {
-    ...blankRecord('freshTwo'), password: 'hunter2',
+    ...blankRecord('freshTwo'), password: 'hunter2', updatedAt: serverTimestamp(),
   })));
 
 await check('cannot create a record with an unknown field', () =>
   assertFails(setDoc(doc(fresh, 'players', 'freshThree'), {
-    ...blankRecord('freshThree'), isAdmin: true,
+    ...blankRecord('freshThree'), isAdmin: true, updatedAt: serverTimestamp(),
   })));
 
 // ============================================================ the admin

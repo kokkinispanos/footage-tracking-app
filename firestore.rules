@@ -137,14 +137,35 @@ service cloud.firestore {
           // every player at once, so one record holding a string where a map belongs would
           // take the whole list down.
           && mapOk('identity') && mapOk('playerCard') && mapOk('contact')
-          && mapOk('deliverables') && mapOk('platforms')
+          && mapOk('deliverables') && mapOk('platforms') && mapOk('coachSignOff')
           && (!('authEmail' in request.resource.data) || request.resource.data.authEmail is string);
       }
 
-      // What a player may change on his own record.
+      // ------------------------------------------------- what the COACH owns
+      //
+      // `coachSignOff` holds the two things the coach says about a player: that the reel is
+      // ready to send, and the address of the proof page clubs get. Both used to live inside
+      // `deliverables`, which the player owns, so he could tick his own coach approval and
+      // swap the link to the page clubs are sent. Nothing automatic keyed off either, but a
+      // screen that says "your coach has checked this video" has to be telling the truth.
+      //
+      // A separate top-level key rather than a nested guard: the player writes whole sections
+      // at a time, so anything he owns is something he can replace. This also stops his save
+      // erasing a sign-off the coach made while he was typing.
+      function coachKeys() { return ['coachSignOff']; }
+
+      // What a player may change on his own record. `coachSignOff` is deliberately absent.
       function ownedKeysOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(sectionKeys().concat(['authEmail', 'updatedAt']));
+      }
+
+      // `updatedAt` is what the coach's list reads as "he added something", so a player must
+      // not be able to hand-write it. serverTimestamp() resolves to request.time here, so
+      // this passes for every honest write and refuses a made-up one.
+      function updatedAtOk() {
+        return !('updatedAt' in request.resource.data.diff(resource.data).affectedKeys())
+          || request.resource.data.updatedAt == request.time;
       }
 
       // What an admin may change: the sections (so he can repair a record and carry an old
@@ -152,7 +173,7 @@ service cloud.firestore {
       // his to reassign — and not `adminNotes`, which live in their own collection now.
       function adminKeysOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(sectionKeys().concat([
+          .hasOnly(sectionKeys().concat(coachKeys()).concat([
             'password', 'role', 'adminNotes',   // only ever removed, enforced by noSecrets()
             'linkedAt', 'mergedInto', 'updatedAt'
           ]));
@@ -165,6 +186,7 @@ service cloud.firestore {
           && request.resource.data.authUid == request.auth.uid
           && request.resource.data.keys()
                .hasOnly(sectionKeys().concat(['authUid', 'authEmail', 'updatedAt']))
+          && request.resource.data.updatedAt == request.time
           // A brand-new account has not verified its address yet, so `authEmail` is normally
           // absent here and written later. If it IS present it must already be the real one.
           && (!('authEmail' in request.resource.data) || myVerifiedEmail());
@@ -185,6 +207,7 @@ service cloud.firestore {
       allow update: if noSecrets()
                     && wellFormed()
                     && authEmailUntouchedOrMine()
+                    && updatedAtOk()
                     && ((mine() && ownedKeysOnly())
                         || (isAdmin() && adminKeysOnly()));
 

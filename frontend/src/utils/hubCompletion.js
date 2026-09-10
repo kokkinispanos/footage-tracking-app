@@ -167,6 +167,11 @@ export function nextThing(record) {
       title: 'Give us the Gmail we send from',
       body: 'Club emails go out from your address, so replies come to you. We need it before we start.',
     },
+    c.identity < HUB_TARGETS.identity && {
+      tab: 'about', anchor: 'identity',
+      title: 'Finish the "Who you are" section',
+      body: 'Your passport country, a photo of it, and whether anyone in your family was born in Europe. Without these nobody abroad can look at you.',
+    },
     c.playerCard < HUB_TARGETS.playerCard && {
       tab: 'about', anchor: 'player-card',
       title: 'Fill in your numbers',
@@ -243,6 +248,11 @@ export function readiness(record) {
     { key: 'instagram', label: 'Instagram', ok: filled(getIn(record, ['contact', 'instagram'])) },
     { key: 'reel', label: 'Highlights video', ok: filled(getIn(record, ['deliverables', 'highlightReel', 'link'])) },
     { key: 'cv', label: 'CV', ok: !!getIn(record, ['deliverables', 'cv', 'file', 'name'], '') },
+    { key: 'headshot', label: 'Headshot', ok: !!getIn(record, ['deliverables', 'headshot', 'file', 'name'], '') },
+    // The two Phase 1 sign-offs. `coachSignOff` is the coach-owned key the player cannot
+    // write, so this line means what it says.
+    { key: 'reelSignedOff', label: 'Reel signed off by you', ok: getIn(record, ['coachSignOff', 'reelApproved', 'done'], false) === true },
+    { key: 'cvSignedOff', label: 'CV checked by the player', ok: getIn(record, ['deliverables', 'cv', 'approvedByPlayer', 'done'], false) === true },
     { key: 'numbers', label: 'Measured numbers', ok: anyFilled(getIn(record, ['playerCard', 'numbers'], {})) },
     { key: 'games', label: '3 full games', ok: (calculateCompletion(record).counts.fullGames || 0) >= 3 },
     { key: 'photos', label: '6 photos', ok: (calculateCompletion(record).counts.photos || 0) >= 6 },

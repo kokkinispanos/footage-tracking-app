@@ -29,5 +29,11 @@ export function useHubSection(sectionKey, { adminMode = false, overrideData = nu
 
   const set = useCallback((key, value) => setPath([key], value), [setPath]);
 
-  return { data, set, setPath, readOnly: adminMode };
+  /** Same as setPath, but written straight away and awaited. For uploads, not for typing. */
+  const setPathNow = useCallback(async (path, value) => {
+    if (adminMode) return;
+    await context.savePathNow(sectionKey, path, value);
+  }, [adminMode, context, sectionKey]);
+
+  return { data, set, setPath, setPathNow, readOnly: adminMode };
 }

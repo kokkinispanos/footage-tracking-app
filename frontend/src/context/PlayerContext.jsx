@@ -30,6 +30,10 @@ export function PlayerProvider({ children }) {
   const dirtyRef = useRef(new Set());
   const timersRef = useRef({});
   const latestRef = useRef(null);
+  // Which record `latestRef` is holding. A debounced save fires long after it was scheduled
+  // and reads the value out of that shared ref, so without this stamp a timer left over from
+  // one account could write the next account's data into the first one's document.
+  const latestDocIdRef = useRef(null);
   // How many edits each section has had. A save that finishes after a newer edit has
   // started must not report itself as the current one — see updateSection.
   const editSeqRef = useRef({});
@@ -70,11 +74,13 @@ export function PlayerProvider({ children }) {
         setData((local) => {
           if (!local) {
             latestRef.current = remote;
+            latestDocIdRef.current = docId;
             return remote;
           }
           const merged = { ...remote };
           for (const key of dirty) merged[key] = local[key];
           latestRef.current = merged;
+          latestDocIdRef.current = docId;
           return merged;
         });
       },
@@ -85,6 +91,7 @@ export function PlayerProvider({ children }) {
       unsubscribe();
       setData(null);
       latestRef.current = null;
+      latestDocIdRef.current = null;
       // A different record (or none) is about to load: the old one's dirty marks and edit
       // counters mean nothing now. Timers already in flight still finish against the docId
       // they captured, which is what we want — an unsaved edit should still reach the server.
@@ -96,6 +103,7 @@ export function PlayerProvider({ children }) {
   // 3. If the tab closes mid-edit, push whatever is still pending.
   useEffect(() => {
     const flush = () => {
+      if (latestDocIdRef.current !== docId) return;
       for (const key of Object.keys(timersRef.current)) {
         clearTimeout(timersRef.current[key]);
         const value = latestRef.current?.[key];
@@ -105,8 +113,15 @@ export function PlayerProvider({ children }) {
       }
       timersRef.current = {};
     };
+    // `pagehide` alone is not enough on a phone: switching apps often fires only
+    // `visibilitychange`, and the tab may never come back.
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('pagehide', flush);
-    return () => window.removeEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onHide);
+    };
   }, [docId]);
 
   // 4. Stamp that he opened it, at most once an hour.
@@ -163,6 +178,28 @@ export function PlayerProvider({ children }) {
       .catch(() => { emailSyncedRef.current = null; });   // let a failed write try again
   }, [docId, user?.email, data?.profile]);
 
+  /**
+   * Write one nested value NOW, with no debounce, and wait for it.
+   *
+   * For things that happen once rather than being typed. An upload is the case that matters:
+   * the file is already in Storage, and until the record says so the two disagree. Through
+   * the debounce that window is 700ms plus a round trip, and closing the tab inside it leaves
+   * them disagreeing for good.
+   */
+  const savePathNow = useCallback(async (sectionKey, path, value) => {
+    if (!PLAYER_OWNED_KEYS.includes(sectionKey)) return;
+    if (!docId) return;
+    setSaveStatus('saving');
+    try {
+      await dbService.savePlayerPath(docId, [sectionKey, ...path].join('.'), value);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus((s) => (s === 'saved' ? 'idle' : s)), 2000);
+    } catch (err) {
+      setSaveStatus('error');
+      throw err;
+    }
+  }, [docId]);
+
   /** Name, position or email. Returns nothing; the snapshot brings the new value back. */
   const saveProfile = useCallback(async (fields) => {
     if (!docId) return;
@@ -196,6 +233,9 @@ export function PlayerProvider({ children }) {
 
     clearTimeout(timersRef.current[sectionKey]);
     timersRef.current[sectionKey] = setTimeout(async () => {
+      // A different record is loaded now. Whatever is in the shared ref belongs to that
+      // one, and writing it here would put one player's answers in another's document.
+      if (latestDocIdRef.current !== docId) return;
       const value = latestRef.current?.[sectionKey];
       try {
         await dbService.savePlayerSections(docId, { [sectionKey]: value });
@@ -230,6 +270,7 @@ export function PlayerProvider({ children }) {
       notFound,
       saveStatus,
       updateSection,
+      savePathNow,
       saveProfile,
     }}>
       {children}

@@ -20,9 +20,18 @@ async function storageApi() {
   return cached;
 }
 
+let bucketHandle = null;
 async function bucket() {
+  if (bucketHandle) return bucketHandle;
   const api = await storageApi();
-  return api.getStorage(app);
+  bucketHandle = api.getStorage(app);
+  // Firebase retries a failing upload for TEN MINUTES by default. When the bucket does not
+  // exist at all, that is ten minutes of a player watching "0% done" with no error and no
+  // way to know anything is wrong. A minute is long enough to ride out bad signal at a
+  // ground and short enough to tell him something is broken.
+  bucketHandle.maxUploadRetryTime = 60000;
+  bucketHandle.maxOperationRetryTime = 20000;
+  return bucketHandle;
 }
 
 const pathFor = (uid, slot) => `players/${uid}/${slot}`;

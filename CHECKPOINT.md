@@ -355,7 +355,7 @@ a phone gives up. The phone bar shows the five of whichever tab he is on.
   take the whole player list down. **`firestore.rules` needs republishing.**
 - `storage.rules` rewritten from `{allPaths=**}` to the four named slots. **Needs publishing,
   and Storage needs switching on at all.**
-- Rule tests: **67, all passing**, including that a hub section cannot be a string or a list,
+- Rule tests: **76, all passing**, including that a hub section cannot be a string or a list,
   that the coach can tick a sign-off and set the proof page, and that a player still cannot
   touch another player's hub sections.
 
@@ -363,8 +363,53 @@ a phone gives up. The phone bar shows the five of whichever tab he is on.
 - Every word a player reads is rewritten short and plain, for someone tired, on a phone, who
   does not enjoy reading. No em dash survives in any rendered string.
 
+**The Codex review (`gpt-5.6-sol`, high effort) — its verdict was "I would not ship this round
+yet", and it was right about three things**
+
+Its file tools were broken this session, so the whole of the reviewed code was pasted into the
+prompt instead. Worth knowing for next time.
+
+1. **A player could tick his own coach approval, and change the link clubs are sent.** Both
+   lived inside `deliverables`, and a player owns that whole section. Nothing automatic keyed
+   off either, which is what the comment in `db.js` said, but a screen that reads "your coach
+   has checked this video" has to be telling the truth, and the proof page link is the address
+   a club is handed. Both now live under `coachSignOff`, a top-level key the rules do not let a
+   player write. That also stops his save wiping a sign-off made while he was typing.
+2. **A leftover save could write one player's answers into another player's record.** The
+   debounced write captured the document id at schedule time but read the VALUE out of a shared
+   ref at fire time, and that ref is repopulated when a different record loads. `latestRef` now
+   carries the id it belongs to and a save whose id no longer matches simply does not happen.
+3. **`updatedAt` could be hand-written.** It is what the coach's list reads as "he added
+   something", so a player could look productive without doing anything. The rules now require
+   it to equal `request.time`, which `serverTimestamp()` satisfies and a made-up date does not.
+4. **Readiness said ready while the reel was unsigned, the CV unchecked and no headshot
+   existed.** Those are Phase 1 exit criteria. The panel is 14 items now, not 11.
+5. **"Everything is in" could show with no passport.** `nextThing` counted identity and then
+   never used it.
+6. **Uploads and the record could drift apart.** The metadata went through the 700ms debounce,
+   so an upload followed by a closed tab left an object nobody pointed at; delete went the other
+   way and left the record claiming a file that was gone. File writes now bypass the debounce
+   and are awaited, and delete updates the record first and the object second. An orphan object
+   is tidy-up; a record claiming a passport that does not exist is a lie the coach acts on.
+7. **An object URL leaked if he navigated away mid-download.** Guarded.
+
+Found while testing its findings: **with Storage switched off an upload did not fail, it hung.**
+Firebase retries for ten minutes by default, so a player would have watched "0% done" with no
+error and no idea. Capped to a minute, verified: it now fails in 61 seconds. A warning appears
+after twelve seconds of no movement.
+
+Left as-is, with reasons: a player can still claim a file exists by writing the metadata without
+uploading (self-defeating, and the coach finds out the moment he opens it); `profile.lastSeenAt`
+is still client-written (it is a server timestamp now, so the honest-clock problem is gone);
+and Storage rules have no emulator tests, which needs the Storage emulator and is worth doing
+once uploads have run for real.
+
 ### Verified
 - Build and lint clean (0 errors, 2 known fast-refresh warnings).
+- 76 rule tests, all passing.
+- Upload guards checked in the browser against real files: a video renamed `.pdf` is caught by
+  its first bytes before any network call, 16 MB is refused with the real size, a photo in the
+  CV slot is refused, and a missing owner id fails with a sentence rather than a Firebase code.
 - The completion maths run against an empty record, a half-filled one, a fully filled one and a
   deliberately malformed one: correct counts, nothing throws. "Not for me" correctly does not
   count as progress; an EU passport changes the eligibility line.

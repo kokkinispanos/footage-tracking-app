@@ -62,7 +62,7 @@ function SignOff({ label, done, at, canTick, onToggle, waitingText }) {
  * in and the first thing a club actually looks at.
  */
 export function SectionDeliverables({ adminMode, overrideData, adminDocId, adminNotes, index = 9 }) {
-  const { data, setPath, readOnly } = useHubSection('deliverables', { adminMode, overrideData });
+  const { data, setPath, setPathNow, readOnly } = useHubSection('deliverables', { adminMode, overrideData });
   const context = usePlayer();
   const record = adminMode ? overrideData : context.playerData;
   const uid = record?.authUid || record?.id;
@@ -72,9 +72,13 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
   const [signingOff, setSigningOff] = useState(false);
 
   const reelLink = getIn(data, ['highlightReel', 'link']);
-  const reelApproved = getIn(data, ['highlightReel', 'approvedByCoach', 'done'], false);
+  // The coach's two values live OUTSIDE this section, under `coachSignOff`, which the rules
+  // do not let a player write. He can see them; he cannot tick his own approval or change
+  // the address clubs are sent to.
+  const coach = record?.coachSignOff && typeof record.coachSignOff === 'object' ? record.coachSignOff : {};
+  const reelApproved = getIn(coach, ['reelApproved', 'done'], false);
   const cvApproved = getIn(data, ['cv', 'approvedByPlayer', 'done'], false);
-  const proofPage = getIn(data, ['proofPage', 'link']);
+  const proofPage = getIn(coach, ['proofPageLink']);
   const warning = linkWarning(reelDraft);
 
   const saveReel = () => {
@@ -144,7 +148,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         <SignOff
           label="Your coach has checked this video and says it is ready to send to clubs."
           done={reelApproved}
-          at={getIn(data, ['highlightReel', 'approvedByCoach', 'at'])}
+          at={getIn(coach, ['reelApproved', 'at'])}
           canTick={adminMode && !signingOff}
           onToggle={async (on) => {
             // The coach's tick is an admin write, not a section edit, so it does not go
@@ -170,7 +174,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
           label="Your CV"
           hint="A PDF. The one we sent you, or your own if you already had one."
           value={getIn(data, ['cv', 'file'], null)}
-          onChange={(file) => setPath(['cv', 'file'], file)}
+          onChange={(file) => setPathNow(['cv', 'file'], file)}
           readOnly={readOnly}
           isAdmin={!!adminMode}
         />
@@ -191,7 +195,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         label="Your best photo"
         hint="Head and shoulders, good light, looking at the camera. This goes on your player page."
         value={getIn(data, ['headshot', 'file'], null)}
-        onChange={(file) => setPath(['headshot', 'file'], file)}
+        onChange={(file) => setPathNow(['headshot', 'file'], file)}
         readOnly={readOnly}
         isAdmin={!!adminMode}
       />

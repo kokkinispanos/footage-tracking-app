@@ -22,7 +22,7 @@ firestore.rules          THE SECURITY OF THE APP. Read this before changing anyt
 storage.rules            Passport / CV / headshot uploads: owner and admin only.
 firebase.json            So `firebase deploy --only firestore:rules` works if the CLI is installed.
 MIGRATION.md             The console steps to switch sign-in on and close the database.
-rules-tests/             60 tests that PROVE firestore.rules does what it says. `npm test`.
+rules-tests/             76 tests that PROVE firestore.rules does what it says. `npm test`.
 AUDIT_2026-09-08.md      Where this all came from: what was broken and what is planned.
 frontend/
   dev.mjs                Starts Vite with the right working directory (the path has spaces).
@@ -72,7 +72,7 @@ npm install
 npm test
 ```
 
-Starts the Firestore emulator (needs Java), runs `firestore.rules` against 60 cases and exits
+Starts the Firestore emulator (needs Java), runs `firestore.rules` against 76 cases and exits
 non-zero if any of them lets something through. **Run this before changing the rules and after.**
 The rules are the only thing standing between a signed-in player and everyone else's data; a
 comment saying they work is not evidence.

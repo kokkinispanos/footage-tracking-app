@@ -182,26 +182,42 @@ export const dbService = {
    * The coach ticking "this reel is ready to send to clubs".
    *
    * One of the five Phase 1 exit criteria, and until now there was nowhere it was written
-   * down. It lives on the player's own record rather than in the admin-only collection so
-   * that HE can see it: knowing the reel is signed off is the point of signing it off.
+   * down. It lives on the player's own record, not in the admin-only collection, because he
+   * needs to SEE it: knowing the reel is signed off is the point of signing it off.
    *
-   * That does mean a player determined enough to open a console could flip his own tick.
-   * It is a marker in a conversation, not a permission, and nothing automatic keys off it,
-   * so the honest trade is to let him see it. If it ever gates a real action, move it.
+   * It lives under `coachSignOff`, which is a top-level key the rules do not let a player
+   * write. It used to sit inside `deliverables`, and a player owns that whole section, so he
+   * could tick his own coach approval and the screen would say "your coach has checked this
+   * video". Being outside also stops his save wiping a sign-off the coach made mid-edit.
    */
   async setCoachSignOff(docId, done) {
     await updateDoc(doc(db, 'players', docId), {
-      'deliverables.highlightReel.approvedByCoach': done
+      'coachSignOff.reelApproved': done
         ? { done: true, at: new Date().toISOString() }
         : { done: false, at: '' },
       updatedAt: serverTimestamp(),
     });
   },
 
-  /** The read-only link to the page clubs get sent. The coach sets it; the player sees it. */
+  /** The link to the page clubs get sent. Coach writes it, player reads it, same reason. */
   async setProofPage(docId, link) {
     await updateDoc(doc(db, 'players', docId), {
-      'deliverables.proofPage.link': (link || '').trim(),
+      'coachSignOff.proofPageLink': (link || '').trim(),
+      updatedAt: serverTimestamp(),
+    });
+  },
+
+  /**
+   * Write ONE value at a nested path, straight away, with no debounce.
+   *
+   * For things that are events rather than typing. An upload is the case that matters: the
+   * file lands in Storage and then the record has to say so. Going through the 700ms
+   * debounce leaves a window where the object exists and the record denies it, and if the
+   * player closes the tab in that window it stays that way for good.
+   */
+  async savePlayerPath(docId, dottedPath, value) {
+    await updateDoc(doc(db, 'players', docId), {
+      [dottedPath]: value,
       updatedAt: serverTimestamp(),
     });
   },

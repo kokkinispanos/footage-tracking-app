@@ -24,7 +24,7 @@ const TONE_BOX = {
  * and we say why.
  */
 export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNotes, index = 6 }) {
-  const { data, set, setPath, readOnly } = useHubSection('identity', { adminMode, overrideData });
+  const { data, set, setPath, setPathNow, readOnly } = useHubSection('identity', { adminMode, overrideData });
   const context = usePlayer();
   const record = adminMode ? overrideData : context.playerData;
   const uid = record?.authUid || record?.id;
@@ -96,7 +96,7 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
           label="Photo of your passport"
           hint="Take a photo of the page with your face on it. Only you and your coach can see it."
           value={getIn(data, ['passportOne', 'file'], null)}
-          onChange={(file) => setPath(['passportOne', 'file'], file)}
+          onChange={(file) => setPathNow(['passportOne', 'file'], file)}
           readOnly={readOnly}
           isAdmin={!!adminMode}
         />
@@ -133,7 +133,7 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
               label="Photo of your second passport"
               hint="Same again. The page with your face on it."
               value={getIn(data, ['passportTwo', 'file'], null)}
-              onChange={(file) => setPath(['passportTwo', 'file'], file)}
+              onChange={(file) => setPathNow(['passportTwo', 'file'], file)}
               readOnly={readOnly}
               isAdmin={!!adminMode}
             />

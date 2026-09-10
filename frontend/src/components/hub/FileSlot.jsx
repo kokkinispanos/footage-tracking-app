@@ -27,11 +27,19 @@ function readableUploadError(err) {
       return 'That upload stopped. Try again.';
     case 'storage/retry-limit-exceeded':
     case 'storage/server-file-wrong-size':
-      return 'Your connection dropped. Try again when you have better signal.';
+      // Bad signal gives this, and so does a project where file saving was never switched
+      // on. The player cannot tell those apart and should not have to, so the message covers
+      // both: try again, and tell us if trying again does not work.
+      return 'That did not go through. It might be your signal. Try again, and tell Pro '
+        + 'Placement if it keeps failing.';
     case 'storage/quota-exceeded':
       return 'Our storage is full. Tell Pro Placement, this one is on us.';
     case 'storage/unknown':
-      return 'File storage is not switched on yet. Tell Pro Placement, this one is on us.';
+    case 'storage/project-not-found':
+    case 'storage/bucket-not-found':
+    case 'storage/invalid-argument':
+      // The common cause by far: Storage has never been switched on for the project.
+      return 'File saving is not switched on yet. Tell Pro Placement, this one is on us.';
     default:
       return err?.message || 'That did not work. Try again in a moment.';
   }
@@ -60,10 +68,14 @@ export function FileSlot({
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);   // an object URL while the viewer is open
   const [opening, setOpening] = useState(false);
+  const [slow, setSlow] = useState(false);
   const { confirm, dialog } = useConfirm();
 
   // An object URL is a live handle on real bytes. Let it go the moment it is not on screen.
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const pick = () => inputRef.current?.click();
 
@@ -78,12 +90,20 @@ export function FileSlot({
     setError('');
     setBusy(true);
     setPercent(0);
+    setSlow(false);
+    // Nothing moving after twelve seconds usually means bad signal, or that file saving was
+    // never switched on. Either way he deserves to be told rather than watching a still bar.
+    const slowTimer = setTimeout(() => setSlow(true), 12000);
     try {
       const saved = await fileService.upload(uid, slot, file, setPercent);
-      onChange(saved);
+      // Awaited on purpose. The file is in Storage now; until the record says so the two
+      // disagree, and the player would be looking at a screen that has forgotten his upload.
+      await onChange(saved);
     } catch (err) {
       setError(readableUploadError(err));
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setBusy(false);
       setPercent(0);
     }
@@ -99,8 +119,11 @@ export function FileSlot({
     setError('');
     setBusy(true);
     try {
+      // Record first, file second. If the second half fails we are left with an object
+      // nobody points at, which is tidy-up. The other order leaves the record claiming a
+      // file that is gone, which is a lie the coach acts on.
+      await onChange(null);
       await fileService.remove(uid, slot);
-      onChange(null);
     } catch (err) {
       setError(readableUploadError(err));
     } finally {
@@ -112,7 +135,11 @@ export function FileSlot({
     setError('');
     setOpening(true);
     try {
-      setPreview(await fileService.openBlobUrl(uid, slot));
+      const url = await fileService.openBlobUrl(uid, slot);
+      // He navigated away while it downloaded. The URL holds real bytes and nothing is going
+      // to put it on screen now, so let it go rather than leaking it.
+      if (!mountedRef.current) { URL.revokeObjectURL(url); return; }
+      setPreview(url);
     } catch {
       // Reading the bytes needs CORS on the bucket. Rather than quietly minting a permanent
       // download link instead, say so. The coach has a way in that does not weaken anything.
@@ -178,7 +205,7 @@ export function FileSlot({
         </div>
       </div>
 
-      {busy && percent > 0 && (
+      {busy && (
         <div className="mt-3">
           <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
             <div className="h-full bg-brand-sheen rounded-full transition-all" style={{ width: `${percent}%` }} />
@@ -187,6 +214,12 @@ export function FileSlot({
             <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
             Sending it up. {percent}% done. Keep this page open.
           </p>
+          {slow && (
+            <p className="text-xs text-warning mt-1.5 leading-relaxed">
+              This is taking a while. Your signal might be weak. If it keeps sitting here,
+              tell Pro Placement and try again later.
+            </p>
+          )}
         </div>
       )}
 
