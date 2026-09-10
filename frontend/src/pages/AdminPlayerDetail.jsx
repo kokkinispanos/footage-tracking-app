@@ -116,7 +116,17 @@ export function AdminPlayerDetail() {
     setBundleError('');
     setBundling(1);
     try {
-      await downloadEverything(playerData, { onProgress: (p) => setBundling(Math.max(1, p)) });
+      const { failed } = await downloadEverything(
+        playerData, { onProgress: (p) => setBundling(Math.max(1, p)) },
+      );
+      // The zip still downloaded. It is just not complete, and the person about to build a
+      // CV from it needs to know that before he starts and not after.
+      if (failed?.length) {
+        setBundleError(
+          `The file downloaded, but it is INCOMPLETE. These could not be read: ${failed.join(', ')}. `
+          + 'Try again before you use it.',
+        );
+      }
     } catch (err) {
       setBundleError(err?.message || 'That did not work. Try again in a moment.');
     } finally {

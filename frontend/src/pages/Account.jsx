@@ -297,7 +297,10 @@ export function Account() {
           description="Everything in here belongs to you. Download it any time. You do not have to ask us."
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <Button variant="secondary" onClick={() => downloadEverything(playerData)} className="gap-2">
+            <Button
+              variant="secondary" className="gap-2"
+              onClick={() => { downloadEverything(playerData).catch(() => {}); }}
+            >
               <Download className="w-4 h-4" /> Everything, in one file
             </Button>
             <Button variant="secondary" onClick={() => downloadLinkSheet(playerData)} className="gap-2">

@@ -2,6 +2,7 @@ import { calculateCompletion, TARGETS } from './completion';
 import { ALL_SKILL_CATEGORIES, PHOTO_TYPES, skillLabel } from './catalog';
 import { lastActiveMs, lastSavedMs, fullDate } from './activity';
 import { UPLOAD_SLOTS, UPLOAD_SLOT_KEYS } from './hubCatalog';
+import { PLAYER_OWNED_KEYS } from '../services/db';
 import { fileService } from '../services/files';
 import { makeZip, dataUrlToBytes, extensionFor } from './zip';
 
@@ -136,9 +137,28 @@ export function buildLinkSheet(playerData) {
   return out.join('\n');
 }
 
-/** Everything exactly as stored, minus the internal plumbing nobody can use outside the app. */
+/**
+ * Everything the player himself owns, and nothing else.
+ *
+ * This used to be a blacklist: strip `id`, `authUid`, `authEmail`, `updatedAt` and keep the
+ * rest. That quietly kept every field it had not been told about, and the six records that
+ * pre-date the security rebuild still carry `password` in plain text, plus `role` and
+ * `adminNotes`, until somebody presses the cleanup button on the admin page. So an admin
+ * exporting a legacy player wrote his old plaintext password into `hub-data.json`, and the
+ * "everything in one file" button then wrapped it in a zip meant to be handed to somebody
+ * else. Found by the Codex review, 2026-09-10.
+ *
+ * An allowlist now. A new internal field is invisible here until somebody deliberately adds
+ * it, which is the right way round for a file that leaves the building.
+ */
+const EXPORT_KEYS = [...PLAYER_OWNED_KEYS, 'coachSignOff'];
+
 export function buildRawJson(playerData) {
-  const { id, authUid, authEmail, updatedAt, ...rest } = playerData || {};
+  const source = playerData || {};
+  const rest = {};
+  EXPORT_KEYS.forEach((key) => {
+    if (source[key] !== undefined) rest[key] = source[key];
+  });
   const savedMs = lastSavedMs(playerData);
   return JSON.stringify(
     {
@@ -219,7 +239,18 @@ export async function copyLinkSheet(playerData) {
 export async function buildEverythingBundle(playerData, { onProgress } = {}) {
   const encoder = new TextEncoder();
   const enc = (text) => encoder.encode(text);
-  const uid = playerData?.authUid || playerData?.id;
+
+  // `authUid` and nothing else. It used to fall back to the document id, which is only the
+  // same thing for records created after the Auth rebuild. On a legacy record that fallback
+  // looked up a file id that cannot exist, found nothing, and the archive then reported a
+  // passport that IS uploaded as "not uploaded yet".
+  const uid = playerData?.authUid;
+  if (!uid) {
+    throw new Error(
+      'This player has not been joined up with a sign-in yet, so his files cannot be '
+      + 'collected. Use "Bring across" on the admin page first.',
+    );
+  }
 
   const entries = [
     { name: 'hub-data.json', bytes: enc(buildRawJson(playerData)) },
@@ -227,33 +258,47 @@ export async function buildEverythingBundle(playerData, { onProgress } = {}) {
   ];
 
   const included = [];
-  const skipped = [];
+  const missing = [];
+  const failed = [];
 
   for (let i = 0; i < UPLOAD_SLOT_KEYS.length; i += 1) {
     const slot = UPLOAD_SLOT_KEYS[i];
     onProgress?.(Math.round(((i + 1) / (UPLOAD_SLOT_KEYS.length + 1)) * 100));
-    let found = null;
+    const label = UPLOAD_SLOTS[slot].label;
+
+    // Three outcomes, not two. "He never uploaded it" and "we could not read it" look the
+    // same from here and mean completely different things to whoever opens the archive.
+    let found;
     try {
       found = await fileService.open(uid, slot);
-    } catch {
-      found = null;
+    } catch (err) {
+      failed.push(`${label} (${err?.code || err?.message || 'could not be read'})`);
+      continue;
     }
-    if (!found?.data) {
-      skipped.push(UPLOAD_SLOTS[slot].label);
+    if (!found?.data) { missing.push(label); continue; }
+
+    let bytes;
+    try {
+      bytes = dataUrlToBytes(found.data);
+    } catch (err) {
+      failed.push(`${label} (${err.message})`);
       continue;
     }
     const name = `files/${UPLOAD_SLOTS[slot].file}.${extensionFor(found.type)}`;
-    entries.push({ name, bytes: dataUrlToBytes(found.data) });
+    entries.push({ name, bytes });
     included.push(name);
   }
 
-  entries.push({ name: 'README.txt', bytes: enc(bundleReadme(playerData, included, skipped)) });
+  entries.push({
+    name: 'README.txt',
+    bytes: enc(bundleReadme(playerData, included, missing, failed)),
+  });
   onProgress?.(100);
-  return makeZip(entries);
+  return { blob: makeZip(entries), included, missing, failed };
 }
 
 /** What is in the box, for whoever opens it in three months. */
-function bundleReadme(playerData, included, skipped) {
+function bundleReadme(playerData, included, missing, failed) {
   const profile = playerData?.profile || {};
   const stats = calculateCompletion(playerData);
   const lines = [
@@ -278,10 +323,20 @@ function bundleReadme(playerData, included, skipped) {
     included.forEach((f) => lines.push(`  ${f}`));
     lines.push('');
   }
-  if (skipped.length) {
+  if (missing.length) {
     lines.push('NOT UPLOADED YET');
     lines.push('-'.repeat(16));
-    skipped.forEach((f) => lines.push(`  ${f}`));
+    missing.forEach((f) => lines.push(`  ${f}`));
+    lines.push('');
+  }
+  // Kept apart from the list above on purpose. A file we could not read is not a file he
+  // never sent, and telling a coach the first when it is the second sends him chasing a
+  // player who already did the work.
+  if (failed.length) {
+    lines.push('*** COULD NOT BE READ. THIS ARCHIVE IS INCOMPLETE. ***');
+    lines.push('-'.repeat(52));
+    failed.forEach((f) => lines.push(`  ${f}`));
+    lines.push('  These exist but did not come out. Try the export again before using this.');
     lines.push('');
   }
   lines.push(`FOOTAGE PROGRESS: ${stats.percent}% (${stats.done} of ${stats.total} pieces)`);
@@ -296,6 +351,7 @@ function bundleReadme(playerData, included, skipped) {
 }
 
 export async function downloadEverything(playerData, options) {
-  const blob = await buildEverythingBundle(playerData, options);
+  const { blob, failed } = await buildEverythingBundle(playerData, options);
   downloadBlob(`${safeName(playerData)}-everything-${stamp()}.zip`, blob);
+  return { failed };
 }

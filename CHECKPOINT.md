@@ -632,3 +632,98 @@ coach can.
   harness was removed again.
 - **Not verified: a real upload of a family proof**, because that needs the republished rules and
   a signed-in player. The code, the rules and the tests are in place; the round trip is untested.
+
+---
+
+## Checkpoint 6 - the Codex review, and a real leak it found (2026-09-10) DONE
+
+Reviewed by Codex (`gpt-5.6-sol`, high, role codereviewer) against checkpoint 5. **Its file host
+is broken** (`codex-code-mode-host.exe` missing), so the code was pasted into the prompt with line
+numbers, the same workaround checkpoint 3 needed. Worth knowing before anyone tries again.
+
+**Eleven findings. Two were serious, and the first one was a live leak.**
+
+### 1. The export could hand out a legacy plaintext password. HIGH. Fixed.
+
+`buildRawJson` was a **blacklist**: strip `id`, `authUid`, `authEmail`, `updatedAt`, keep
+everything else. It therefore kept every field it had not been told about. **The six records that
+pre-date the Auth rebuild still carry `password` in plain text**, plus `role` and `adminNotes`,
+because clearing them is the admin button Panos has deferred. So an admin exporting a legacy
+player wrote that password into `hub-data.json`, and checkpoint 5's new "Everything, in one file"
+button then wrapped it in a zip built specifically to be handed to somebody else.
+
+Checkpoint 1 of this file claims "The JSON export never contains a password." **That was wrong**,
+and it stayed wrong for two days. It is an allowlist now: `PLAYER_OWNED_KEYS` plus `coachSignOff`
+and nothing else, so a new internal field is invisible to the export until somebody deliberately
+adds it.
+
+Proved with a legacy-shaped record carrying a password, a role and a private coach note: none of
+the three appear anywhere in the output under any key, and the real data still does.
+
+### 2. A stored `javascript:` link would run when clicked. HIGH. Fixed.
+
+`CV_Template_v2.html` escapes values into HTML, which stops an attribute breakout but does nothing
+about the SCHEME. A reel link stored as `javascript:...` would execute on click, in a local
+document holding a real player's details. `safeHref()` now allows http and https only. Anything
+else is still **printed as plain text** rather than dropped, because a CV that silently loses a
+line is how a wrong CV reaches a club. The headshot is restricted to `data:image/...` the same way,
+so opening a CV cannot quietly call a remote server.
+
+Verified live: a `javascript:` reel and a `data:text/html` match link both render as inert text,
+https and http still render as links, and a remote photo URL falls back to the placeholder.
+
+### 3. A file we could not read was reported as a file he never sent. MEDIUM. Fixed.
+
+The bundle caught every Firestore error and pushed the slot into "skipped", so a permission error,
+an expired session or a dropped connection all came out as **"NOT UPLOADED YET"** next to a
+passport that is in fact uploaded. That sends a coach chasing a player who already did the work.
+
+Three outcomes now, not two: `included`, `missing`, `failed`. A failure names the slot and the
+reason, the README carries a `*** THIS ARCHIVE IS INCOMPLETE ***` block, and the admin page says
+so on screen even though the download still succeeded.
+
+### 4. `authUid || id` addressed the wrong files. MEDIUM. Fixed.
+
+The fallback only works when the document id happens to be the Auth uid, which is untrue for every
+legacy record. It looked up a file id that cannot exist, found nothing, and finding 3 then turned
+that into "not uploaded". It requires `authUid` now and fails fast with a sentence telling the
+coach to use "Bring across" first.
+
+### 5. `dataUrlToBytes` returned empty bytes, or threw outside the try. MEDIUM. Fixed.
+
+A comma-less value produced a **zero byte file listed as successfully included**. Bad base64 or bad
+percent-encoding threw from outside the per-slot try and killed the whole export without saying
+which file was damaged. It throws named errors now, the decode is inside the per-slot try, and
+nothing enters `included` until the bytes exist. Tested against seven malformed inputs.
+
+### 6 to 11. The rest.
+
+- **Zip boundary checks added** (65,535 entries, 65,535-byte names, 4 GB). Past those a classic zip
+  does not fail, it wraps the field and writes a corrupt archive that looks fine. Codex confirmed
+  the structure is otherwise **byte-correct**: CRC, local and central offsets, EOCD, the UTF-8
+  flag, empty archive, empty file, non-ASCII names. Re-verified through python's `zipfile`.
+- **Date-only values were parsed as UTC midnight** and read back local, so west of UTC a birthday
+  and an age were a day early. `calendarDate()` parses `YYYY-MM-DD` as a calendar date now.
+  Athens is east of UTC so Panos would never have seen it; a club or an editor abroad would.
+- **`totals()` hardened**: `Array.isArray`, finite non-negative integers only. A truthy non-array
+  `seasons` used to throw and render nothing at all. Verified it now degrades to an empty table.
+- **The career row's last two cells were blank.** They are the yellow and red totals, filled now.
+- `Account.jsx` had an unhandled promise rejection on the player's own export. Caught.
+
+### NOT changed, and why
+
+Codex flagged `fileId.split('__')[0] == request.auth.uid` in `firestore.rules` as a
+delimiter-ambiguous authorization primitive: a uid containing `__` could in theory collide.
+**Firebase Auth uids are 28 characters of alphanumerics and never contain an underscore**, and no
+player can create a colliding document through these rules anyway. Changing it would cost Panos
+another manual republish for no real gain. **Accepted risk, recorded here.** If this project ever
+takes imported or custom uids, authorize on `resource.data.ownerUid` instead.
+
+### Verified after the fixes
+- Build and lint clean. **97 rule tests passing.**
+- Zip edge cases through python `zipfile`: empty archive, empty file, unicode filename, nested
+  path. All CRC-valid, names round-trip, UTF-8 flag set.
+- The leak test above.
+- `buildEverythingBundle` with no `authUid` throws; with unreadable files it reports 5 `failed`,
+  0 `missing`, and stamps the README incomplete.
+- The CV template's hostile-input test above.

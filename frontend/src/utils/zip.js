@@ -7,8 +7,15 @@
  * bundle of an app that holds passports.
  *
  * Store method only (compression 0). No ZIP64, which caps the archive at 4 GB and 65,535
- * files. A player hub bundle is a handful of files and a few megabytes.
+ * files. A player hub bundle is a handful of files and a few megabytes, and the limits are
+ * now checked rather than assumed: past them a classic ZIP does not fail, it wraps the field
+ * modulo 2^32 and writes a corrupt archive that looks fine until somebody opens it.
  */
+
+/** Classic ZIP field widths. Past any of these the format silently lies. */
+const MAX_ENTRIES = 65535;
+const MAX_NAME_BYTES = 65535;
+const MAX_SIZE = 0xFFFFFFFE;        // 0xFFFFFFFF is the ZIP64 sentinel, so stop below it
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -43,6 +50,10 @@ function writeU32(view, offset, value) { view.setUint32(offset, value, true); }
  * @returns {Blob}
  */
 export function makeZip(files) {
+  if (!Array.isArray(files)) throw new Error('makeZip needs a list of files.');
+  if (files.length > MAX_ENTRIES) {
+    throw new Error(`Too many files for one archive (${files.length}, limit ${MAX_ENTRIES}).`);
+  }
   const encoder = new TextEncoder();
   const stamp = dosStamp(new Date());
   const parts = [];
@@ -52,6 +63,8 @@ export function makeZip(files) {
   files.forEach((file) => {
     const nameBytes = encoder.encode(file.name);
     const data = file.bytes;
+    if (nameBytes.length > MAX_NAME_BYTES) throw new Error(`File name too long: ${file.name}`);
+    if (data.length > MAX_SIZE) throw new Error(`File too big for a classic zip: ${file.name}`);
     const crc = crc32(data);
 
     // Local file header: 30 bytes, then the name, then the data.
@@ -99,6 +112,10 @@ export function makeZip(files) {
   });
 
   const centralSize = central.reduce((sum, e) => sum + e.length, 0);
+  // The central directory's own size and the offset it starts at are both 32 bit fields.
+  if (offset > MAX_SIZE || centralSize > MAX_SIZE) {
+    throw new Error('Archive is too large for a classic zip. Export fewer files.');
+  }
 
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
@@ -114,14 +131,37 @@ export function makeZip(files) {
   return new Blob([...parts, ...central, end], { type: 'application/zip' });
 }
 
-/** Turn a `data:` URL, which is how files come back out of Firestore, into raw bytes. */
+/**
+ * Turn a `data:` URL, which is how files come back out of Firestore, into raw bytes.
+ *
+ * It THROWS on anything malformed rather than returning empty bytes. Returning an empty
+ * array was worse than useless: the caller then wrote a zero byte file into the archive and
+ * listed it as included, so a bundle claiming to hold a passport held nothing and said so
+ * nowhere. A named error lets the caller say which file is damaged.
+ */
 export function dataUrlToBytes(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+    throw new Error('That is not a stored file.');
+  }
   const comma = dataUrl.indexOf(',');
-  if (comma < 0) return new Uint8Array(0);
+  if (comma < 0) throw new Error('The stored file is damaged (no data separator).');
+
   const meta = dataUrl.slice(0, comma);
   const body = dataUrl.slice(comma + 1);
-  if (!meta.includes(';base64')) return new TextEncoder().encode(decodeURIComponent(body));
-  const binary = atob(body);
+
+  if (!meta.includes(';base64')) {
+    try {
+      return new TextEncoder().encode(decodeURIComponent(body));
+    } catch {
+      throw new Error('The stored file is damaged (bad percent encoding).');
+    }
+  }
+  let binary;
+  try {
+    binary = atob(body);
+  } catch {
+    throw new Error('The stored file is damaged (bad base64).');
+  }
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
