@@ -472,6 +472,38 @@ suite. **93 rule tests, all passing.**
 
 ---
 
+## Checkpoint 3c — two bugs found by actually using it (2026-09-10) ✅ DONE
+
+Panos signed up as a player and hit both within minutes. Worth recording because neither would
+ever have shown up in a build, a lint or a rule test.
+
+**The Save button was off the bottom of the screen.** The clip modals render inside `GlassCard`,
+which uses `backdrop-blur`, and **an ancestor with a backdrop-filter becomes the containing block
+for any `position: fixed` descendant**. So the dialog was sized and placed against the CARD, not
+the window. Measured on a 560px window: the panel ran 141 to 617, hanging 57px off the bottom,
+with Save at 538 to 580. He filled the form in and had nothing to press.
+
+`Modal` and the file preview now render through a **portal onto `document.body`**. Measured after:
+the dialog spans 0 to 560, and Save is visible with the body scrolled to the top and to the
+bottom, at 900x560 and at 375x812. The modals also got a pinned action bar, because even placed
+correctly the buttons were the last thing in a scrolling body.
+
+> If you add another overlay anywhere in this app, portal it. Half the surfaces here are cards
+> with `backdrop-blur` on them, and a fixed overlay inside one is silently not fixed at all.
+
+**"Send it again" did nothing.** It caught the error and dropped it, so the real reason was
+invisible. The real reason is almost always that Firebase rate-limits verification emails hard,
+and pressing the button repeatedly is exactly what keeps it failing. The banner now says what
+happened, holds a 60 second cooldown, points at Promotions and spam (where these land far more
+often than the inbox), names the sender, and offers an "I clicked it" re-check. The signup send
+no longer vanishes either.
+
+Ruled out first, so nobody re-checks it: the Vercel domain is missing from Firebase's authorized
+domains, but that list does not gate email/password flows. Tested directly against the Identity
+Toolkit from the deployed origin: it rejects on the token, not the origin.
+
+---
+
 ## Checkpoint 4 — the CV generator
 
 Panos's idea: hand a Claude session one player's hub data plus his standard CV template, and get
