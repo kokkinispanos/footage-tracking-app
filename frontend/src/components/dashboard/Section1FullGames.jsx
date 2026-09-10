@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { EmptyState } from '../ui/EmptyState';
 import { Modal } from '../ui/Modal';
+import { ModalActions } from '../ui/ModalActions';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { StatusPill } from '../ui/Brand';
 import { SectionShell } from './SectionShell';
@@ -151,10 +152,10 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </div>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-2">
+            <ModalActions>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit">{editingId ? 'Save changes' : 'Add game'}</Button>
-            </div>
+            </ModalActions>
           </form>
         </Modal>
       )}

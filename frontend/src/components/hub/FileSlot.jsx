@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, FileCheck2, Trash2, Eye, Loader2, AlertTriangle, X } from 'lucide-react';
 import { fileService, fileProblem } from '../../services/files';
 import { UPLOAD_SLOTS } from '../../utils/hubCatalog';
@@ -223,7 +224,9 @@ export function FileSlot({
         className="hidden"
       />
 
-      {preview && (
+      {/* Portalled for the same reason as Modal: a card with `backdrop-blur` above it would
+          otherwise become the containing block and trap this overlay inside the card. */}
+      {preview && createPortal(
         <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <button
             onClick={() => setPreview(null)}
@@ -235,7 +238,8 @@ export function FileSlot({
           {preview.type === 'application/pdf'
             ? <iframe title={label} src={preview.data} className="w-full h-full max-w-4xl rounded-xl bg-white" />
             : <img alt={label} src={preview.data} className="max-w-full max-h-full rounded-xl object-contain" />}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

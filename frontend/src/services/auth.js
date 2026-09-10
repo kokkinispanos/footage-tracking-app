@@ -65,7 +65,20 @@ export function readableAuthError(err) {
   }
 }
 
+/**
+ * Why the verification email did not go, if it did not.
+ *
+ * Kept here rather than thrown, because a failed verification mail must never stop an
+ * account being created: the player can use the whole hub without it. What it must not do
+ * is disappear, which is what a bare `.catch(() => {})` did.
+ */
+let lastVerificationError = null;
+
 export const authService = {
+  get lastVerificationError() {
+    return lastVerificationError;
+  },
+
   /** The signed-in Firebase user right now, or null. */
   get currentUser() {
     return auth.currentUser;
@@ -77,8 +90,16 @@ export const authService = {
     if (fullName) {
       await updateProfile(cred.user, { displayName: fullName.trim() }).catch(() => {});
     }
-    // Non-fatal: a failed verification mail must not block a working signup.
-    await sendEmailVerification(cred.user).catch(() => {});
+    // Non-fatal: a failed verification mail must not block a working signup. But it must
+    // not vanish either. The banner on the dashboard reads this and says so, instead of the
+    // player waiting all evening for an email that was never accepted for sending.
+    try {
+      await sendEmailVerification(cred.user);
+      lastVerificationError = null;
+    } catch (err) {
+      lastVerificationError = err;
+      if (import.meta.env?.DEV) console.warn('[auth] verification mail failed at signup', err);
+    }
     return cred.user;
   },
 
@@ -115,7 +136,16 @@ export const authService = {
   },
 
   async resendVerification() {
-    if (auth.currentUser) await sendEmailVerification(auth.currentUser);
+    if (!auth.currentUser) {
+      throw Object.assign(new Error('not signed in'), { code: 'auth/null-user' });
+    }
+    try {
+      await sendEmailVerification(auth.currentUser);
+      lastVerificationError = null;
+    } catch (err) {
+      lastVerificationError = err;
+      throw err;      // the banner shows this; it used to be swallowed
+    }
   },
 
   /**

@@ -1,10 +1,19 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 /**
  * Full-screen sheet on a phone, centred dialog on a desktop.
  * Escape closes it, the background stops scrolling behind it, and focus starts inside.
+ *
+ * Rendered through a PORTAL onto document.body, and that is load-bearing rather than tidy.
+ * These modals live inside GlassCard, which uses `backdrop-blur`, and an ancestor with a
+ * backdrop-filter becomes the containing block for any `position: fixed` descendant. So the
+ * dialog was being sized and placed against the CARD instead of the window: on a short
+ * screen it hung off the bottom, taking the Save button with it, and the player filled the
+ * whole form in and had nothing to press. A portal puts it back on the viewport where a
+ * fixed overlay belongs.
  */
 export function Modal({ isOpen, onClose, title, children, className }) {
   const panelRef = useRef(null);
@@ -24,7 +33,7 @@ export function Modal({ isOpen, onClose, title, children, className }) {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -65,6 +74,7 @@ export function Modal({ isOpen, onClose, title, children, className }) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

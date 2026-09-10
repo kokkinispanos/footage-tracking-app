@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { MailWarning, LifeBuoy, Download, CloudOff } from 'lucide-react';
+import { LifeBuoy, Download, CloudOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import { useOnlineStatus, useDurableOffline } from '../hooks/useOnlineStatus';
@@ -11,6 +11,7 @@ import { Button } from '../components/ui/Button';
 import { GlassCard } from '../components/ui/GlassCard';
 import { ProgressPanel } from '../components/dashboard/ProgressPanel';
 import { NextStep } from '../components/dashboard/NextStep';
+import { VerifyBanner } from '../components/dashboard/VerifyBanner';
 import { SectionNav } from '../components/dashboard/SectionNav';
 import { FOOTAGE_NAV, ABOUT_NAV } from '../components/dashboard/navItems';
 import { cn } from '../utils/cn';
@@ -87,11 +88,10 @@ function Tabs({ tab, onTab, stats }) {
 }
 
 export function Dashboard() {
-  const { user, logout, resendVerification } = useAuth();
+  const { user, logout, resendVerification, refreshUser } = useAuth();
   const { playerData, loading, notFound, saveStatus } = usePlayer();
   const online = useOnlineStatus();
   const durable = useDurableOffline();
-  const [verificationSent, setVerificationSent] = useState(false);
   const [tab, setTab] = useState('footage');
 
   // `scroll-mt-24` on each anchor keeps the sticky header off the heading. The tab has to
@@ -111,13 +111,6 @@ export function Dashboard() {
 
   const stats = calculateEverything(playerData);
   const firstName = (playerData.profile?.fullName || '').trim().split(' ')[0] || 'there';
-
-  const sendVerification = async () => {
-    try {
-      await resendVerification();
-      setVerificationSent(true);
-    } catch { /* the banner simply stays */ }
-  };
 
   return (
     <div className="min-h-dvh pb-28 sm:pb-20">
@@ -142,19 +135,11 @@ export function Dashboard() {
         )}
 
         {user && !user.emailVerified && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-warning/[0.08] border border-warning/25 rounded-2xl px-4 py-3.5 animate-fadeIn">
-            <MailWarning className="w-5 h-5 text-warning flex-none" />
-            <p className="text-sm text-ink-muted flex-1 leading-relaxed">
-              {verificationSent
-                ? 'Sent. Go and check your email, and look in your spam folder too.'
-                : <>Please click the link in the email we sent to <span className="text-ink">{user.email}</span>. It proves the address is yours.</>}
-            </p>
-            {!verificationSent && (
-              <Button variant="secondary" size="sm" onClick={sendVerification} className="flex-none">
-                Send it again
-              </Button>
-            )}
-          </div>
+          <VerifyBanner
+            email={user.email}
+            onResend={resendVerification}
+            onRecheck={refreshUser}
+          />
         )}
 
         <section className="animate-riseIn">
