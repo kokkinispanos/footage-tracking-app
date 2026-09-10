@@ -17,10 +17,19 @@ import { CONSENTS, PLATFORMS, isEuEea } from './hubCatalog';
 const filled = (value) => typeof value === 'string' && value.trim().length > 0;
 const anyFilled = (obj) => Object.values(obj || {}).some((v) => filled(String(v ?? '')));
 
+/**
+ * Raised on 2026-09-10, when the CV started being written from this app.
+ *
+ * playerCard 8 to 10 and contact 4 to 6. The four new ones are the answers a CV cannot be
+ * written without and nobody had ever been asked for: what he is good at, what system he
+ * plays in, whether he has an agent, and whether anyone would speak for him. Everything
+ * else added in that pass is optional and deliberately does not move a counter, because a
+ * progress bar that only ever goes down teaches a player to ignore it.
+ */
 export const HUB_TARGETS = {
   identity: 6,
-  playerCard: 8,
-  contact: 4,
+  playerCard: 10,
+  contact: 6,
   deliverables: 3,
   platforms: 4,
 };
@@ -55,6 +64,10 @@ export function countPlayerCard(record) {
   if (Array.isArray(card.languages) && card.languages.length > 0) done += 1;
   if (anyFilled(card.numbers)) done += 1;
   if (Array.isArray(card.seasons) && card.seasons.some((s) => filled(s?.club))) done += 1;
+  // The two the CV genuinely cannot be written without. A strengths block invented for him
+  // is the one part of a CV a scout can catch him out on at the trial.
+  if (Array.isArray(card.strengths) && card.strengths.length > 0) done += 1;
+  if (filled(card.tacticalFit)) done += 1;
   return done;
 }
 
@@ -65,6 +78,10 @@ export function countContact(record) {
   if (filled(c.instagram)) done += 1;
   if (filled(c.gmailForClubs)) done += 1;
   if (filled(getIn(c, ['parent', 'name'])) && filled(getIn(c, ['parent', 'email']))) done += 1;
+  // "No" is a complete answer to both of these, and for most players it is the true one.
+  // Counting only "yes" would leave every honest player permanently short of the target.
+  if (c.hasAgent === 'no' || (c.hasAgent === 'yes' && filled(getIn(c, ['agent', 'name'])))) done += 1;
+  if (c.hasReference === 'no' || (c.hasReference === 'yes' && filled(getIn(c, ['reference', 'name'])))) done += 1;
   return done;
 }
 
@@ -176,7 +193,7 @@ export function nextThing(record) {
     c.playerCard < HUB_TARGETS.playerCard && {
       tab: 'about', anchor: 'player-card',
       title: 'Fill in your numbers',
-      body: 'Height, foot, your club, what you have been clocked at. This goes into every email a club gets.',
+      body: 'Height, foot, your club, what you are good at, what system you play in. Your CV gets written from this, word for word.',
     },
     c.deliverables < HUB_TARGETS.deliverables && {
       tab: 'about', anchor: 'deliverables',
@@ -191,7 +208,7 @@ export function nextThing(record) {
     c.contact < HUB_TARGETS.contact && {
       tab: 'about', anchor: 'contact',
       title: 'Finish your contact details',
-      body: 'Phone, Instagram, and whoever is paying. A club that likes you needs a way through.',
+      body: 'Phone, Instagram, whoever is paying, and whether you have an agent or a coach who would speak for you. A club that likes you needs a way through.',
     },
   ].filter(Boolean);
 

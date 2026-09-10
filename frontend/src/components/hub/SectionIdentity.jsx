@@ -68,6 +68,22 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
           placeholder="Pick the one that fits"
           className="sm:col-span-1"
         />
+        <TextField
+          label="Which town were you born in?"
+          value={data.birthTown}
+          onChange={(v) => set('birthTown', v)}
+          readOnly={readOnly}
+          hint="It goes on your CV, the same as it is on your passport."
+        />
+        <SelectField
+          label="Which country were you born in?"
+          value={data.birthCountry}
+          onChange={(v) => set('birthCountry', v)}
+          readOnly={readOnly}
+          options={ALL_COUNTRIES}
+          placeholder="Pick the country"
+          hint="Sometimes this is not the same as your passport. That can matter."
+        />
       </div>
 
       {/* ------------------------------------------------------------ passport 1 */}
@@ -186,6 +202,23 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
               placeholder="Pick the country"
             />
           </div>
+        )}
+
+        {/* The answer above is worth more than anything else in the app, and it is also the
+            one nobody can act on until somebody has seen a piece of paper. Asking here, while
+            he is already thinking about it, is the only moment he will go and look. */}
+        {familyAnswer === 'yes' && (
+          <FileSlot
+            slot="familyProof"
+            uid={uid}
+            playerDocId={playerDocId}
+            claimPath="identity.euFamily.file"
+            label="Proof of your family link"
+            hint="A birth certificate, an old passport, a marriage certificate. A photo or a PDF. If you have to ask your family for it, ask them today, because this is what turns a maybe into a yes."
+            value={getIn(data, ['euFamily', 'file'], null)}
+            onChange={(file) => setPath(['euFamily', 'file'], file)}
+            readOnly={readOnly}
+          />
         )}
       </div>
 

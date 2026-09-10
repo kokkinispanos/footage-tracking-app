@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, FileCheck2, Trash2, Eye, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Upload, FileCheck2, Trash2, Eye, Loader2, AlertTriangle, X, Download } from 'lucide-react';
 import { fileService, fileProblem } from '../../services/files';
 import { UPLOAD_SLOTS } from '../../utils/hubCatalog';
+import { dataUrlToBytes, extensionFor } from '../../utils/zip';
 import { Button } from '../ui/Button';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { cn } from '../../utils/cn';
@@ -61,6 +62,7 @@ export function FileSlot({
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);   // { data, type } while the viewer is open
   const [opening, setOpening] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => () => { mountedRef.current = false; }, []);
@@ -139,6 +141,43 @@ export function FileSlot({
     }
   };
 
+  /**
+   * Save the file onto the machine you are sitting at.
+   *
+   * The viewer was the only way to get at these, which meant right-clicking a preview and
+   * hoping. The CV gets built from a player's own headshot and the editor wants his photos,
+   * so a file you can look at but not keep is a file that gets asked for again by hand.
+   *
+   * It goes through the same read as the viewer, so the rules are still checked and no
+   * durable link is created; the bytes just land in the downloads folder instead of on
+   * the screen.
+   */
+  const save = async (already) => {
+    setError('');
+    setSaving(true);
+    try {
+      const found = already || await fileService.open(uid, slot);
+      if (!found?.data) {
+        setError('We cannot find that file any more. Please add it again.');
+        return;
+      }
+      const bytes = dataUrlToBytes(found.data);
+      const blob = new Blob([bytes], { type: found.type || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${spec?.file || slot}.${extensionFor(found.type)}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      if (mountedRef.current) setError(readableUploadError(err));
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  };
+
   const has = !!value?.name;
 
   return (
@@ -173,9 +212,17 @@ export function FileSlot({
 
         <div className="flex items-center gap-2 flex-none">
           {has && (
-            <Button variant="ghost" size="sm" onClick={view} loading={opening} className="gap-1.5">
-              <Eye className="w-3.5 h-3.5" /> Look at it
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" onClick={view} loading={opening} className="gap-1.5">
+                <Eye className="w-3.5 h-3.5" /> Look at it
+              </Button>
+              <Button
+                variant="ghost" size="sm" onClick={() => save()} loading={saving}
+                aria-label={`Save ${label.toLowerCase()}`} className="gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Save it
+              </Button>
+            </>
           )}
           {!readOnly && (
             <>
@@ -234,6 +281,14 @@ export function FileSlot({
             className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 text-ink hover:bg-white/20 transition-colors"
           >
             <X className="w-5 h-5" />
+          </button>
+          {/* Already fetched, so saving from here costs nothing and does not read again. */}
+          <button
+            onClick={() => save(preview)}
+            aria-label="Save this file"
+            className="absolute top-4 right-[4.5rem] p-2.5 rounded-full bg-white/10 text-ink hover:bg-white/20 transition-colors"
+          >
+            <Download className="w-5 h-5" />
           </button>
           {preview.type === 'application/pdf'
             ? <iframe title={label} src={preview.data} className="w-full h-full max-w-4xl rounded-xl bg-white" />

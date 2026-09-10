@@ -315,6 +315,21 @@ await check('and deletes it', () =>
 await check('a made-up slot is refused', () =>
   assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__secrets`), fileDoc(PLAYER_A, 'secrets'))));
 
+// The fifth slot, added 2026-09-10 with the CV fields: the birth certificate or old
+// passport behind the family answer. It is an identity document like the others, so it
+// gets tested like the others rather than trusted because it is new.
+await check('a player saves the proof of his family link', () =>
+  assertSucceeds(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__familyProof`), fileDoc(PLAYER_A, 'familyProof'))));
+
+await check('a player CANNOT read another player family proof', () =>
+  assertFails(getDoc(doc(b, 'playerFiles', `${PLAYER_A}__familyProof`))));
+
+await check('the coach can read a family proof', () =>
+  assertSucceeds(getDoc(doc(admin, 'playerFiles', `${PLAYER_A}__familyProof`))));
+
+await check('a player deletes his own family proof', () =>
+  assertSucceeds(deleteDoc(doc(a, 'playerFiles', `${PLAYER_A}__familyProof`))));
+
 await check('an id that does not match the slot is refused', () =>
   assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__cv`), fileDoc(PLAYER_A, 'headshot'))));
 

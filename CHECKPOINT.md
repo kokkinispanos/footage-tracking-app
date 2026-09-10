@@ -541,3 +541,94 @@ counts for nothing and confuses whoever reads it later.
 
 Panos's idea: hand a Claude session one player's hub data plus his standard CV template, and get
 the finished CV back as a PDF.
+
+---
+
+## Checkpoint 5 — the CV fields, and one file with everything in it (2026-09-10) DONE
+
+**Why this stage exists.** The CV stopped being a template the player fills in. From now on it is
+written for him from what is in this app, by a session that reads his record. That only works if
+the app actually holds everything a CV needs, and it did not. Five fields had nowhere to live and
+the files could be looked at but not kept.
+
+Panos's instruction, in his words: everything that might possibly be needed for the CV, and do not
+be afraid to add a bit more if unsure, because worst case the player does five or ten minutes of
+extra work and that is not a deal breaker.
+
+### What a player is now asked
+
+**Who you are** — the town and country he was born in, and, when he answers yes to the family
+question, **a photo of the paper that proves it**. That answer is the most valuable line in the
+app and nobody can act on it until somebody has seen a birth certificate, so it is asked for in
+the same breath rather than chased weeks later.
+
+**Your numbers** — a second position, his shirt number, and how good his other foot really is.
+How well he speaks each language he already listed, not just which ones. Whether he would move
+abroad, how much notice he needs for a trial, and anything that would stop him travelling. What
+he is actually good at, as tappable strengths rather than an empty box, with a keeper's own list.
+What system he plays best in. Who he plays a bit like. What he is working on.
+
+**His seasons** are no longer four numbers. Each one now carries the country, **which team it was
+for** (first team, U19, academy), minutes, yellows, reds, clean sheets for a keeper, and a line
+for anything about that season. "20 games" means a different thing in an U19 side, and a CV that
+does not say which is a CV a scout stops trusting.
+
+**How we reach you** — does he have an agent, and if so his name, agency, phone, email and FIFA
+licence number, under a plain warning that writing it here does not mean anybody contacts him
+(S12: no agent is ever contacted without the player saying so first). And someone who would speak
+for him: a coach, what he is to him, which club, how a club reaches him. **"No" is a complete
+answer to both**, and for most players it is the true one, so the counters accept it. Counting
+only "yes" would leave every honest player permanently short.
+
+**Your finished stuff** — the tall cut and the one-minute cut of his reel, beside the main one.
+
+### The counters moved, deliberately and only twice
+
+`playerCard` 8 to 10 and `contact` 4 to 6. The four that count are the ones a CV cannot be written
+without: his strengths, his system, whether he has an agent, whether anyone would speak for him.
+**Everything else added here is optional and moves nothing**, because a progress bar that only ever
+goes down teaches a player to ignore it. Hub total 25 to 29.
+
+### One click, one file
+
+`Everything, in one file` on the admin page. A single zip holding `hub-data.json` (every answer
+exactly as stored), `footage-links.txt` (the flat list for the editor), `README.txt` (what is in
+the box and what he has not uploaded yet) and `files/` with every document he has uploaded. That
+is the file that gets handed to a session to write a CV, instead of clicking through the app
+copying fields out one at a time. The player has the same button on his account page, because it
+is his own work.
+
+`utils/zip.js` is a hand-written store-method zip writer, about sixty lines, **no dependency**.
+Everything going in is already compressed so DEFLATE would buy nothing, and a dependency in the
+bundle of an app that holds passports is a bigger thing to own than sixty lines. Verified by
+building an archive and handing it to python's `zipfile`: CRCs all pass, a JPEG comes back
+byte-identical, UTF-8 filenames and content survive with the flag set.
+
+**Save buttons on every uploaded file**, in the row and inside the viewer, for the player and the
+coach. They could be looked at and not kept, which meant right-clicking a preview and hoping. The
+save goes through the same Firestore read as the viewer, so the rules are still checked on the way
+and no durable link is created.
+
+### Rules
+
+`familyProof` added to the slot allowlist in `firestore.rules`. It is an identity document like
+the passports, so it is tested like them: **97 rule tests, all passing** (was 93). The four new
+ones prove a player can save and delete his own, that another player cannot read it, and that the
+coach can.
+
+> **PANOS HAS TO REPUBLISH `firestore.rules`.** Until he does, everything else on this checkpoint
+> works and only the family-proof upload is refused. Firestore, Rules, paste the file, Publish.
+
+### Verified
+
+- `npm run build` clean. `npm run lint` 0 errors, the 2 known fast-refresh warnings.
+- 97 rule tests passing.
+- The zip round-tripped through python's `zipfile`, above.
+- The completion maths driven live in the browser: an empty record scores 0 across all five
+  sections, a full one scores 29 of 29, removing his strengths drops `playerCard` from 10 to 9 and
+  clearing the agent answer drops `contact` from 6 to 5. So the new fields really do gate.
+- All four sections mounted in a throwaway browser harness with a filled record: every new block
+  renders, zero React errors, and four Save buttons appear against the four stored files. The
+  harness was removed again.
+- **Not verified: a real upload of a family proof**, because that needs the republished rules and
+  a signed-in player. The code, the rules and the tests are in place; the round trip is untested.

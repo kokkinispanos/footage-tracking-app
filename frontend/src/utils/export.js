@@ -1,6 +1,9 @@
 import { calculateCompletion, TARGETS } from './completion';
 import { ALL_SKILL_CATEGORIES, PHOTO_TYPES, skillLabel } from './catalog';
 import { lastActiveMs, lastSavedMs, fullDate } from './activity';
+import { UPLOAD_SLOTS, UPLOAD_SLOT_KEYS } from './hubCatalog';
+import { fileService } from '../services/files';
+import { makeZip, dataUrlToBytes, extensionFor } from './zip';
 
 /**
  * Getting the player's own work back out of the app.
@@ -156,6 +159,17 @@ export function buildRawJson(playerData) {
  * Hand the file to the browser.
  * The object URL is revoked on the next tick — Safari cancels the download if it goes early.
  */
+export function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function downloadText(filename, text, mime = 'text/plain;charset=utf-8') {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -185,4 +199,103 @@ export function downloadRawJson(playerData) {
 /** Clipboard, for the player who wants to paste it straight into a message. */
 export async function copyLinkSheet(playerData) {
   await navigator.clipboard.writeText(buildLinkSheet(playerData));
+}
+
+
+/**
+ * ONE file with everything in it.
+ *
+ * This is the button that starts a CV. The player's answers, his footage links and the
+ * actual files he uploaded, in a single zip that gets handed to a session and read without
+ * anybody clicking through the app copying things out.
+ *
+ * The files have to be fetched one at a time, because each one is its own Firestore
+ * document and the rules are checked on every read. That is the design and it is the right
+ * one; it just means this button takes a couple of seconds rather than none.
+ *
+ * A file that will not open is skipped rather than failing the whole bundle. A missing
+ * headshot is a note in the README; a bundle that refuses to build because of it is useless.
+ */
+export async function buildEverythingBundle(playerData, { onProgress } = {}) {
+  const encoder = new TextEncoder();
+  const enc = (text) => encoder.encode(text);
+  const uid = playerData?.authUid || playerData?.id;
+
+  const entries = [
+    { name: 'hub-data.json', bytes: enc(buildRawJson(playerData)) },
+    { name: 'footage-links.txt', bytes: enc(buildLinkSheet(playerData)) },
+  ];
+
+  const included = [];
+  const skipped = [];
+
+  for (let i = 0; i < UPLOAD_SLOT_KEYS.length; i += 1) {
+    const slot = UPLOAD_SLOT_KEYS[i];
+    onProgress?.(Math.round(((i + 1) / (UPLOAD_SLOT_KEYS.length + 1)) * 100));
+    let found = null;
+    try {
+      found = await fileService.open(uid, slot);
+    } catch {
+      found = null;
+    }
+    if (!found?.data) {
+      skipped.push(UPLOAD_SLOTS[slot].label);
+      continue;
+    }
+    const name = `files/${UPLOAD_SLOTS[slot].file}.${extensionFor(found.type)}`;
+    entries.push({ name, bytes: dataUrlToBytes(found.data) });
+    included.push(name);
+  }
+
+  entries.push({ name: 'README.txt', bytes: enc(bundleReadme(playerData, included, skipped)) });
+  onProgress?.(100);
+  return makeZip(entries);
+}
+
+/** What is in the box, for whoever opens it in three months. */
+function bundleReadme(playerData, included, skipped) {
+  const profile = playerData?.profile || {};
+  const stats = calculateCompletion(playerData);
+  const lines = [
+    'PRO PLACEMENT — PLAYER HUB EXPORT',
+    '='.repeat(40),
+    `${profile.fullName || 'Unnamed player'}${profile.position ? ` · ${profile.position}` : ''}`,
+    `Exported ${new Date().toLocaleString()}`,
+    '',
+    'WHAT IS IN HERE',
+    '-'.repeat(15),
+    'hub-data.json      Every answer the player gave, exactly as stored.',
+    '                   This is the file to read first. It holds his identity,',
+    '                   his numbers, his seasons, his contacts, his platforms',
+    '                   and his finished links.',
+    'footage-links.txt  The same footage as a flat list, for the editor.',
+    'files/             The documents he uploaded.',
+    '',
+  ];
+  if (included.length) {
+    lines.push('FILES INCLUDED');
+    lines.push('-'.repeat(14));
+    included.forEach((f) => lines.push(`  ${f}`));
+    lines.push('');
+  }
+  if (skipped.length) {
+    lines.push('NOT UPLOADED YET');
+    lines.push('-'.repeat(16));
+    skipped.forEach((f) => lines.push(`  ${f}`));
+    lines.push('');
+  }
+  lines.push(`FOOTAGE PROGRESS: ${stats.percent}% (${stats.done} of ${stats.total} pieces)`);
+  const gaps = missingList(playerData);
+  if (gaps.length) {
+    lines.push('Still to send: ' + gaps.join(', '));
+  }
+  lines.push('');
+  lines.push('These are a real person\'s identity documents. Do not put this folder anywhere');
+  lines.push('shared, and delete it once the work it was pulled for is finished.');
+  return lines.join('\n');
+}
+
+export async function downloadEverything(playerData, options) {
+  const blob = await buildEverythingBundle(playerData, options);
+  downloadBlob(`${safeName(playerData)}-everything-${stamp()}.zip`, blob);
 }

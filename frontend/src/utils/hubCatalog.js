@@ -149,6 +149,75 @@ export const PLATFORM_STATUS = [
   { value: 'na', label: 'Not for me', tone: 'neutral' },
 ];
 
+// ------------------------------------------------------- the rest of his game
+/**
+ * Everything below was added for the CV.
+ *
+ * The CV is written for him from what is in this app, so anything the CV needs and the app
+ * cannot hold is a question somebody has to ask him again by hand. These are those questions.
+ * A player spends five extra minutes here and nobody chases him for a week.
+ */
+
+/** What he played, not just where. "20 games" means a different thing in an U19 side. */
+export const TEAM_LEVELS = [
+  { value: 'first', label: 'First team' },
+  { value: 'reserves', label: 'Reserves or B team' },
+  { value: 'u23', label: 'U23 or U21' },
+  { value: 'u19', label: 'U19 or U18' },
+  { value: 'academy', label: 'Academy' },
+  { value: 'college', label: 'College or university' },
+  { value: 'other', label: 'Something else' },
+];
+
+/** A club that is about to fly him in wants to know if he can be talked to. */
+export const LANGUAGE_LEVELS = [
+  { value: 'native', label: 'First language' },
+  { value: 'fluent', label: 'Fluent' },
+  { value: 'ok', label: 'Can get by' },
+  { value: 'basic', label: 'A few words' },
+];
+
+export const RELOCATION = [
+  { value: 'anywhere', label: 'Anywhere. I will go.' },
+  { value: 'europe', label: 'Europe only' },
+  { value: 'depends', label: 'Depends where it is' },
+  { value: 'no', label: 'Not right now' },
+];
+
+/** A trial usually lands with about three days' notice, so this is a real question. */
+export const TRIAL_NOTICE = [
+  { value: 'now', label: 'I could go this week' },
+  { value: 'week', label: 'I need about a week' },
+  { value: 'month', label: 'I need about a month' },
+  { value: 'season', label: 'After my season ends' },
+];
+
+export const WEAK_FOOT = [
+  { value: 'strong', label: 'Nearly as good' },
+  { value: 'ok', label: 'I can use it' },
+  { value: 'weak', label: 'I barely use it' },
+];
+
+/**
+ * What he is good at, as taps rather than an empty box.
+ *
+ * An empty box marked "your strengths" gets left blank or gets one word. A list gets tapped,
+ * and what he taps is the raw material for the strengths block on his CV.
+ */
+export const STRENGTH_TAGS = [
+  'Speed', 'Stamina', 'Strength in a duel', 'Heading', 'First touch', 'Passing range',
+  'Long passing', 'Crossing', 'Dribbling', 'Finishing', 'Tackling', 'Interceptions',
+  'Positioning', 'Reading the game', 'Pressing', 'Work rate', 'Leadership', 'Composure',
+  'Set pieces', 'Free kicks', 'Penalties', 'One v one defending', 'Recovery runs',
+  'Both feet',
+];
+
+export const GK_STRENGTH_TAGS = [
+  'Shot stopping', 'Reflexes', 'Commanding the box', 'Crosses', 'Distribution with hands',
+  'Distribution with feet', 'Playing out from the back', 'One v one saves', 'Penalty saves',
+  'Organising the defence', 'Communication', 'Positioning', 'Reading the game', 'Composure',
+];
+
 // ---------------------------------------------------------------- uploads
 /**
  * The four files the hub accepts, and nothing else.
@@ -163,11 +232,18 @@ export const PLATFORM_STATUS = [
  * the way out.
  */
 export const UPLOAD_SLOTS = {
-  passportOne: { accept: 'image/*', label: 'Passport photo' },
-  passportTwo: { accept: 'image/*', label: 'Second passport photo' },
-  cv: { accept: 'application/pdf', label: 'Your CV' },
-  headshot: { accept: 'image/*', label: 'Your photo' },
+  passportOne: { accept: 'image/*', label: 'Passport photo', file: 'passport-1' },
+  passportTwo: { accept: 'image/*', label: 'Second passport photo', file: 'passport-2' },
+  cv: { accept: 'application/pdf', label: 'Your CV', file: 'cv' },
+  headshot: { accept: 'image/*', label: 'Your photo', file: 'headshot' },
+  // The family answer is the highest-value line in the app, and a birth certificate is what
+  // turns it from something he thinks into something a club can act on. A photo or a PDF,
+  // because these arrive as both.
+  familyProof: { accept: 'image/*,application/pdf', label: 'Proof of your family link', file: 'family-proof' },
 };
+
+/** The slot ids, in the order the export bundles them. */
+export const UPLOAD_SLOT_KEYS = Object.keys(UPLOAD_SLOTS);
 
 /**
  * The size limits, and where they come from.

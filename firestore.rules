@@ -48,7 +48,7 @@ service cloud.firestore {
 
     // ------------------------------------------------------------ playerFiles
     //
-    // The passport photos, the CV and the headshot. One document per file, id
+    // The passport photos, the family-link proof, the CV and the headshot. One document per file, id
     // `<owner uid>__<slot>`, holding the file itself as a base64 string.
     //
     // Why here and not Firebase Storage: Storage needs the paid Blaze plan and this project
@@ -70,7 +70,10 @@ service cloud.firestore {
       function validFile() {
         return request.resource.data.ownerUid == request.auth.uid
           && fileId == request.auth.uid + '__' + request.resource.data.slot
-          && request.resource.data.slot in ['passportOne', 'passportTwo', 'cv', 'headshot']
+          // `familyProof` added 2026-09-10: the birth certificate or old passport that turns
+          // "my grandmother was Irish" into something a club can act on. Same treatment as
+          // the passports, because that is exactly what it is.
+          && request.resource.data.slot in ['passportOne', 'passportTwo', 'cv', 'headshot', 'familyProof']
           && request.resource.data.data is string
           // A Firestore document tops out at 1 MiB including field names. The client shrinks
           // photos to fit; this is the wall that makes that true rather than hoped for.

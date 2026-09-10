@@ -234,6 +234,34 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         />
       </div>
 
+      {/* ------------------------------------------------------- the other cuts */}
+      <div className="rounded-xl bg-black/20 border border-white/[0.07] p-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">The other cuts of your video</h3>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
+            Your editor makes more than one version. The tall one is for Instagram, the short
+            one is for messages. Paste them here as you get them, so you are not hunting
+            through old chats for them later.
+          </p>
+        </div>
+        <TextField
+          label="The tall one, for Instagram and TikTok"
+          value={getIn(data, ['reelVertical', 'link'])}
+          onChange={(v) => setPath(['reelVertical', 'link'], v)}
+          readOnly={readOnly}
+          placeholder="https://..."
+          hint="Paste the whole link."
+        />
+        <TextField
+          label="The short one, about a minute"
+          value={getIn(data, ['reelShort', 'link'])}
+          onChange={(v) => setPath(['reelShort', 'link'], v)}
+          readOnly={readOnly}
+          placeholder="https://..."
+          hint="This is the one you send in a message. Nobody opens a four minute video in a DM."
+        />
+      </div>
+
       {/* ----------------------------------------------------------- the photo */}
       <FileSlot
         slot="headshot"

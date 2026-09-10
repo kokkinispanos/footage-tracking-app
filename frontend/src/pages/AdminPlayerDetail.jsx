@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Check, AlertTriangle, FileText, Copy, Pencil, Clock } from 'lucide-react';
+import { ArrowLeft, Download, Check, AlertTriangle, FileText, Copy, Pencil, Clock, Package } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { calculateEverything } from '../utils/hubCompletion';
 import { describeActivity, humanAge, fullDate, lastSavedMs, lastSeenMs } from '../utils/activity';
-import { downloadLinkSheet, downloadRawJson, copyLinkSheet } from '../utils/export';
+import { downloadLinkSheet, downloadRawJson, copyLinkSheet, downloadEverything } from '../utils/export';
 import { POSITIONS } from '../utils/catalog';
 import { Input } from '../components/ui/Input';
 import { AppHeader } from '../components/ui/AppHeader';
@@ -97,6 +97,32 @@ export function AdminPlayerDetail() {
       }
     }, 800);
   }, [id]);
+
+  /**
+   * One click, one file, everything in it.
+   *
+   * This is the button that starts a CV. It bundles his answers, his footage links and the
+   * documents he uploaded into a single zip, so the whole record can be handed to a session
+   * in one go instead of being clicked out of the app a field at a time.
+   *
+   * The files are read one by one, because each is its own document and the rules are
+   * checked on every read, so this takes a couple of seconds and says so while it works.
+   */
+  const [bundling, setBundling] = useState(0);       // 0 = idle, otherwise percent
+  const [bundleError, setBundleError] = useState('');
+
+  const grabEverything = useCallback(async () => {
+    if (!playerData) return;
+    setBundleError('');
+    setBundling(1);
+    try {
+      await downloadEverything(playerData, { onProgress: (p) => setBundling(Math.max(1, p)) });
+    } catch (err) {
+      setBundleError(err?.message || 'That did not work. Try again in a moment.');
+    } finally {
+      setBundling(0);
+    }
+  }, [playerData]);
 
   const copySheet = useCallback(async () => {
     if (!playerData) return;
@@ -247,6 +273,12 @@ export function AdminPlayerDetail() {
           <ProgressPanel stats={stats} />
 
           <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm" onClick={grabEverything} loading={bundling > 0} className="gap-1.5"
+            >
+              <Package className="w-3.5 h-3.5" />
+              {bundling > 0 ? `Packing it up, ${bundling}%` : 'Everything, in one file'}
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => downloadLinkSheet(playerData)} className="gap-1.5">
               <FileText className="w-3.5 h-3.5" /> Link sheet for the editor
             </Button>
@@ -258,6 +290,16 @@ export function AdminPlayerDetail() {
               <Download className="w-3.5 h-3.5" /> Raw data
             </Button>
           </div>
+          {bundleError && (
+            <p className="mt-2 flex items-start gap-2 text-[13px] text-error">
+              <AlertTriangle className="w-4 h-4 flex-none mt-px" /> {bundleError}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-ink-faint leading-relaxed">
+            One file holds his answers, his footage links and every document he has uploaded.
+            It has his passport in it, so keep it off anything shared and delete it when the
+            job it was pulled for is done.
+          </p>
         </section>
 
         <GlassCard className="space-y-3">

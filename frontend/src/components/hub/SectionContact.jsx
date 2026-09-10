@@ -1,7 +1,7 @@
-import { Phone, Info } from 'lucide-react';
+import { Phone, Info, ShieldAlert } from 'lucide-react';
 import { SectionShell } from '../dashboard/SectionShell';
 import { AdminNoteField } from '../dashboard/AdminNoteField';
-import { TextField } from './Field';
+import { TextField, ChoiceField } from './Field';
 import { useHubSection, getIn } from './useHubSection';
 import { usePlayer } from '../../context/PlayerContext';
 import { countContact, HUB_TARGETS } from '../../utils/hubCompletion';
@@ -70,6 +70,126 @@ export function SectionContact({ adminMode, overrideData, adminDocId, adminNotes
           readOnly={readOnly} type="email" placeholder="you@gmail.com"
           hint="It has to be a Gmail. Make a new one if you would rather keep this separate."
         />
+      </div>
+
+      {/* ------------------------------------------------------------- the agent */}
+      <div className="rounded-xl bg-black/20 border border-white/[0.07] p-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Do you have an agent?</h3>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
+            Most players do not, and that is completely normal. If you do, a club will ask who
+            he is, so it goes on your CV.
+          </p>
+        </div>
+        <ChoiceField
+          value={data.hasAgent} onChange={(v) => set('hasAgent', v)}
+          readOnly={readOnly}
+          options={[
+            { value: 'yes', label: 'Yes, I have one' },
+            { value: 'no', label: 'No, I do not' },
+          ]}
+        />
+
+        {data.hasAgent === 'yes' && (
+          <>
+            {/* S12: the engine never contacts an agent without the player saying so first,
+                and a blank consent is never contacted. Saying that here stops him assuming
+                we are about to ring the man. */}
+            <div className="flex items-start gap-2.5 rounded-lg bg-warning/[0.07] border border-warning/25 px-3.5 py-2.5">
+              <ShieldAlert className="w-4 h-4 text-warning flex-none mt-0.5" />
+              <p className="text-[13px] text-ink-muted leading-relaxed">
+                Writing him here does not mean we contact him. Nobody speaks to your agent
+                unless you tell us to, in writing, first.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <TextField
+                label="His name"
+                value={getIn(data, ['agent', 'name'])}
+                onChange={(v) => setPath(['agent', 'name'], v)}
+                readOnly={readOnly}
+              />
+              <TextField
+                label="His agency"
+                value={getIn(data, ['agent', 'agency'])}
+                onChange={(v) => setPath(['agent', 'agency'], v)}
+                readOnly={readOnly}
+                hint="Leave it empty if he works on his own."
+              />
+              <TextField
+                label="His phone"
+                value={getIn(data, ['agent', 'phone'])}
+                onChange={(v) => setPath(['agent', 'phone'], v)}
+                readOnly={readOnly} type="tel" inputMode="tel"
+              />
+              <TextField
+                label="His email"
+                value={getIn(data, ['agent', 'email'])}
+                onChange={(v) => setPath(['agent', 'email'], v)}
+                readOnly={readOnly} type="email"
+              />
+              <TextField
+                label="His FIFA licence number"
+                value={getIn(data, ['agent', 'licence'])}
+                onChange={(v) => setPath(['agent', 'licence'], v)}
+                readOnly={readOnly}
+                hint="Only real agents have one. If he cannot give you it, tell us."
+                className="sm:col-span-2"
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* --------------------------------------------------------- the reference */}
+      <div className="rounded-xl bg-black/20 border border-white/[0.07] p-4 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Someone who would speak for you</h3>
+          <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">
+            A coach, a manager, a scout. Someone who has watched you play and would pick up
+            the phone. One name on your CV that a club can ring is worth more than a whole
+            page of adjectives.
+          </p>
+        </div>
+        <ChoiceField
+          value={data.hasReference} onChange={(v) => set('hasReference', v)}
+          readOnly={readOnly}
+          options={[
+            { value: 'yes', label: 'Yes, I have someone' },
+            { value: 'no', label: 'Not yet' },
+          ]}
+        />
+
+        {data.hasReference === 'yes' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <TextField
+              label="His name"
+              value={getIn(data, ['reference', 'name'])}
+              onChange={(v) => setPath(['reference', 'name'], v)}
+              readOnly={readOnly}
+            />
+            <TextField
+              label="What is he to you?"
+              value={getIn(data, ['reference', 'role'])}
+              onChange={(v) => setPath(['reference', 'role'], v)}
+              readOnly={readOnly}
+              placeholder="My coach for three years"
+            />
+            <TextField
+              label="Which club?"
+              value={getIn(data, ['reference', 'club'])}
+              onChange={(v) => setPath(['reference', 'club'], v)}
+              readOnly={readOnly}
+            />
+            <TextField
+              label="How does a club reach him?"
+              value={getIn(data, ['reference', 'contact'])}
+              onChange={(v) => setPath(['reference', 'contact'], v)}
+              readOnly={readOnly}
+              hint="A phone number or an email. Ask him first."
+            />
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-black/20 border border-white/[0.07] p-4 space-y-4">
