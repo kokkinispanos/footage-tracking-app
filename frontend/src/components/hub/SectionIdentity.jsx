@@ -94,11 +94,10 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
           slot="passportOne"
           uid={uid}
           label="Photo of your passport"
-          hint="Take a photo of the page with your face on it. Only you and your coach can see it."
+          hint="Take a photo of the page with your face on it. Make sure you can read it. Only you and your coach can ever see it."
           value={getIn(data, ['passportOne', 'file'], null)}
           onChange={(file) => setPathNow(['passportOne', 'file'], file)}
           readOnly={readOnly}
-          isAdmin={!!adminMode}
         />
       </div>
 
@@ -135,7 +134,6 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
               value={getIn(data, ['passportTwo', 'file'], null)}
               onChange={(file) => setPathNow(['passportTwo', 'file'], file)}
               readOnly={readOnly}
-              isAdmin={!!adminMode}
             />
           )}
         </div>

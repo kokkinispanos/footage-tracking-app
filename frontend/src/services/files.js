@@ -1,48 +1,69 @@
-import { app } from './firebase';
-import { UPLOAD_SLOTS, MAX_UPLOAD_BYTES } from '../utils/hubCatalog';
+import { db } from './firebase';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { UPLOAD_SLOTS, MAX_FILE_BYTES, MAX_PDF_BYTES, MAX_STORED_CHARS } from '../utils/hubCatalog';
 
 /**
- * The four files a player can upload: two passports, a CV, a photo.
+ * The files a player uploads: two passport photos, a CV, a headshot.
  *
- * Loaded on demand. `firebase/storage` is a chunk of download that a player waiting on a
- * ground's wifi should not pay for until he actually picks a file, so nothing here is
- * imported at the top of the app.
+ * They live in FIRESTORE, not Firebase Storage. Storage needs the paid Blaze plan and this
+ * project stays on the free one, so each file is shrunk on the phone and stored as a base64
+ * string in its own document under `playerFiles`.
  *
- * Path is `players/<his uid>/<slot>` with no extension. The slot list is fixed in
- * storage.rules too, so he cannot invent a filename or fill the bucket with objects, and
- * uploading again simply replaces what was there. The real filename and type are stored in
- * Firestore next to it, which is what the screen shows him.
+ * That turns out to be the safer design anyway. Firebase Storage hands out download links
+ * that carry their own access token and keep working for anyone who ever sees one, which is
+ * the wrong property for a passport. A Firestore document has no URL at all: the only way to
+ * read it is to be signed in as its owner or as an admin, and `firestore.rules` decides that
+ * on every read.
+ *
+ * The costs of doing it this way, stated plainly:
+ *  - A Firestore document tops out at 1 MiB, so photos are compressed to fit and a PDF that
+ *    will not fit is refused with an explanation rather than quietly truncated.
+ *  - One document per file, never on the player's own record, so the coach's list does not
+ *    drag a megabyte of passport photos down the wire just to draw a row of names.
  */
 
-let cached = null;
-async function storageApi() {
-  if (!cached) cached = await import('firebase/storage');
-  return cached;
+/** `playerFiles/<uid>__<slot>`. One document per file, so nothing else pays for its size. */
+export const fileDocId = (uid, slot) => `${uid}__${slot}`;
+
+/**
+ * Shrink a photo on the phone, before anything is sent.
+ *
+ * A modern phone camera makes 3 to 8 MB a shot and none of that detail is needed to read a
+ * passport. Long edge 1600px at quality 0.82 lands around 250 to 400 KB, which is easily
+ * readable and easily under the limit. If it still does not fit, the quality steps down.
+ */
+async function shrinkImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const longEdge = Math.max(bitmap.width, bitmap.height);
+  const scale = longEdge > 1600 ? 1600 / longEdge : 1;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  for (const quality of [0.82, 0.7, 0.6, 0.5, 0.4]) {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    if (dataUrl.length <= MAX_STORED_CHARS) return dataUrl;
+  }
+  return null;   // even at 0.4 it will not fit; the caller explains why
 }
 
-let bucketHandle = null;
-async function bucket() {
-  if (bucketHandle) return bucketHandle;
-  const api = await storageApi();
-  bucketHandle = api.getStorage(app);
-  // Firebase retries a failing upload for TEN MINUTES by default. When the bucket does not
-  // exist at all, that is ten minutes of a player watching "0% done" with no error and no
-  // way to know anything is wrong. A minute is long enough to ride out bad signal at a
-  // ground and short enough to tell him something is broken.
-  bucketHandle.maxUploadRetryTime = 60000;
-  bucketHandle.maxOperationRetryTime = 20000;
-  return bucketHandle;
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
 }
-
-const pathFor = (uid, slot) => `players/${uid}/${slot}`;
 
 /**
  * What the file actually starts with, not what its name claims.
  *
- * The browser reports a type from the extension, so a renamed video arrives labelled
- * "application/pdf" and the rules believe it. Reading the first few bytes catches the
- * honest mistake before it costs someone an upload on a bad connection. It is a courtesy
- * check: the size cap in the rules is what actually protects anything.
+ * The browser types a file from its extension, so a renamed video arrives labelled
+ * "application/pdf". Reading the first bytes catches the honest mistake early.
  */
 async function looksLikeWhatItSays(file) {
   const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
@@ -63,88 +84,104 @@ async function looksLikeWhatItSays(file) {
 export function fileProblem(file, slot) {
   if (!file) return 'Pick a file first.';
   if (file.size === 0) return 'That file is empty. Try picking it again.';
-  if (file.size > MAX_UPLOAD_BYTES) {
-    return `That file is too big. The limit is 15 MB and yours is ${Math.round(file.size / 1048576)} MB.`;
-  }
-  const slotSpec = UPLOAD_SLOTS[slot];
-  if (slotSpec?.accept === 'application/pdf' && file.type !== 'application/pdf') {
+
+  const spec = UPLOAD_SLOTS[slot];
+  if (spec?.accept === 'application/pdf' && file.type !== 'application/pdf') {
     return 'This one has to be a PDF.';
   }
-  if (slotSpec?.accept === 'image/*' && !file.type?.startsWith('image/')) {
+  if (spec?.accept === 'image/*' && !file.type?.startsWith('image/')) {
     return 'This one has to be a photo.';
   }
   if (!file.type?.startsWith('image/') && file.type !== 'application/pdf') {
     return 'Use a photo or a PDF.';
+  }
+  // A photo is shrunk before it is sent, so only the silly ceiling applies to it. A PDF
+  // cannot be shrunk, so it is measured against what will actually fit.
+  if (file.type.startsWith('image/') && file.size > MAX_FILE_BYTES) {
+    return `That photo is huge (${Math.round(file.size / 1048576)} MB). Take it again, or pick a smaller one.`;
+  }
+  if (file.type === 'application/pdf' && file.size > MAX_PDF_BYTES) {
+    return `That PDF is ${Math.round(file.size / 1024)} KB. The most we can take is `
+      + `${Math.round(MAX_PDF_BYTES / 1024)} KB. Save it smaller, or paste a link to it instead.`;
   }
   return null;
 }
 
 export const fileService = {
   /**
-   * Send one file up. `onProgress` gets 0 to 100 so the player can watch it move.
-   * Returns what to store in Firestore: never a URL, only what the screen needs to show.
+   * Save one file. Photos are shrunk first. Returns what the player's record should hold:
+   * the name, size and date, and nothing that could be used to reach the file from outside.
    */
   async upload(uid, slot, file, onProgress) {
-    // Without an owner id the path would be `players/undefined/...`, which the rules refuse
-    // anyway. Failing here gives a sentence instead of a Firebase code.
     if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
     if (!UPLOAD_SLOTS[slot]) throw new Error(`Unknown slot "${slot}"`);
+
     const problem = fileProblem(file, slot);
     if (problem) throw new Error(problem);
     if (!(await looksLikeWhatItSays(file))) {
       throw new Error('That file does not look like what its name says. Try saving it again.');
     }
 
-    const api = await storageApi();
-    const ref = api.ref(await bucket(), pathFor(uid, slot));
+    onProgress?.(15);
+    const isImage = file.type.startsWith('image/');
+    const data = isImage ? await shrinkImage(file) : await readAsDataUrl(file);
 
-    await new Promise((resolve, reject) => {
-      const task = api.uploadBytesResumable(ref, file, {
-        contentType: file.type,
-        // Shown in the Firebase console, so whoever opens the bucket sees a real name.
-        customMetadata: { originalName: file.name.slice(0, 120) },
-      });
-      task.on(
-        'state_changed',
-        (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-        reject,
-        resolve,
+    if (!data) {
+      throw new Error('We could not make that photo small enough. Take it again from further back.');
+    }
+    if (data.length > MAX_STORED_CHARS) {
+      throw new Error(
+        `That file is too big to save (${Math.round(data.length / 1024)} KB). `
+        + 'Save it smaller, or paste a link to it instead.',
       );
+    }
+
+    onProgress?.(60);
+    await setDoc(doc(db, 'playerFiles', fileDocId(uid, slot)), {
+      ownerUid: uid,
+      slot,
+      name: file.name.slice(0, 120),
+      type: isImage ? 'image/jpeg' : file.type,
+      data,
+      savedAt: serverTimestamp(),
     });
+    onProgress?.(100);
 
     return {
       name: file.name.slice(0, 120),
-      size: file.size,
-      type: file.type,
+      // The stored size, not the original: this is what he would get back.
+      size: Math.round((data.length * 3) / 4),
+      type: isImage ? 'image/jpeg' : file.type,
       uploadedAt: new Date().toISOString(),
     };
   },
 
   async remove(uid, slot) {
-    const api = await storageApi();
-    try {
-      await api.deleteObject(api.ref(await bucket(), pathFor(uid, slot)));
-    } catch (err) {
-      // Already gone is the outcome we wanted anyway.
-      if (err?.code !== 'storage/object-not-found') throw err;
-    }
+    await deleteDoc(doc(db, 'playerFiles', fileDocId(uid, slot)));
   },
 
   /**
-   * Get a file back for viewing, as a blob the browser can show and then forget.
+   * Read a file back for viewing.
    *
-   * Deliberately NOT `getDownloadURL`. That mints a permanent link carrying its own access
-   * token: anyone who ever sees it can open the file forever, whatever the rules say
-   * afterwards. For a passport that is the wrong trade. A blob is fetched with the signed-in
-   * user's credentials, lives in memory, and dies when the viewer closes it.
-   *
-   * Blob reads need CORS on the bucket. If it is not configured yet this throws, and the
-   * caller says so plainly rather than quietly falling back to minting a permanent URL.
+   * The data URL comes straight out of Firestore. Nothing is minted, nothing is shareable,
+   * and the rules were consulted on the way. `null` means the record claims a file that is
+   * not actually there, which the caller says out loud rather than hiding.
    */
-  async openBlobUrl(uid, slot) {
+  async open(uid, slot) {
     if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
-    const api = await storageApi();
-    const blob = await api.getBlob(api.ref(await bucket(), pathFor(uid, slot)));
-    return URL.createObjectURL(blob);
+    const snap = await getDoc(doc(db, 'playerFiles', fileDocId(uid, slot)));
+    if (!snap.exists()) return null;
+    return { data: snap.data().data, type: snap.data().type };
+  },
+
+  /** Does the file really exist? The coach's page uses this to catch a record that lies. */
+  async exists(uid, slot) {
+    if (!uid) return false;
+    try {
+      const snap = await getDoc(doc(db, 'playerFiles', fileDocId(uid, slot)));
+      return snap.exists();
+    } catch {
+      return false;
+    }
   },
 };

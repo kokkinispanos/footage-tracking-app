@@ -270,6 +270,71 @@ await check('a properly shaped write still goes through', () =>
     'profile.fullName': 'A Real Name', updatedAt: serverTimestamp(),
   })));
 
+// ========================================== the files (passports live here)
+section('Uploaded files');
+
+const smallImage = 'data:image/jpeg;base64,' + 'A'.repeat(2000);
+const fileDoc = (uid, slot, data = smallImage) => ({
+  ownerUid: uid, slot, name: 'passport.jpg', type: 'image/jpeg', data, savedAt: serverTimestamp(),
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'playerFiles', `${PLAYER_B}__passportOne`), fileDoc(PLAYER_B, 'passportOne'));
+});
+
+await check('a stranger cannot read a passport', () =>
+  assertFails(getDoc(doc(anon, 'playerFiles', `${PLAYER_B}__passportOne`))));
+
+await check('a stranger cannot list the files', () =>
+  assertFails(getDocs(collection(anon, 'playerFiles'))));
+
+await check('a player CANNOT read another player passport', () =>
+  assertFails(getDoc(doc(a, 'playerFiles', `${PLAYER_B}__passportOne`))));
+
+await check('a player cannot list every file', () =>
+  assertFails(getDocs(collection(a, 'playerFiles'))));
+
+await check('a player cannot delete another player passport', () =>
+  assertFails(deleteDoc(doc(a, 'playerFiles', `${PLAYER_B}__passportOne`))));
+
+await check('a player cannot write into another player slot', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_B}__cv`), fileDoc(PLAYER_B, 'cv'))));
+
+await check('a player cannot claim someone else as the owner of his own file', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__cv`), fileDoc(PLAYER_B, 'cv'))));
+
+await check('a player saves his own passport', () =>
+  assertSucceeds(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__passportOne`), fileDoc(PLAYER_A, 'passportOne'))));
+
+await check('and reads it back', () =>
+  assertSucceeds(getDoc(doc(a, 'playerFiles', `${PLAYER_A}__passportOne`))));
+
+await check('and deletes it', () =>
+  assertSucceeds(deleteDoc(doc(a, 'playerFiles', `${PLAYER_A}__passportOne`))));
+
+await check('a made-up slot is refused', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__secrets`), fileDoc(PLAYER_A, 'secrets'))));
+
+await check('an id that does not match the slot is refused', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__cv`), fileDoc(PLAYER_A, 'headshot'))));
+
+await check('a file over the size ceiling is refused', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__cv`),
+    fileDoc(PLAYER_A, 'cv', 'data:application/pdf;base64,' + 'A'.repeat(900001)))));
+
+await check('an extra field on a file is refused', () =>
+  assertFails(setDoc(doc(a, 'playerFiles', `${PLAYER_A}__cv`),
+    { ...fileDoc(PLAYER_A, 'cv'), sneaky: true })));
+
+await check('the coach can read any player file', () =>
+  assertSucceeds(getDoc(doc(admin, 'playerFiles', `${PLAYER_B}__passportOne`))));
+
+await check('the coach can list them', () =>
+  assertSucceeds(getDocs(collection(admin, 'playerFiles'))));
+
+await check('the coach can delete one', () =>
+  assertSucceeds(deleteDoc(doc(admin, 'playerFiles', `${PLAYER_B}__passportOne`))));
+
 section('What only the coach may say');
 
 await check('a player cannot tick his own coach sign-off', () =>

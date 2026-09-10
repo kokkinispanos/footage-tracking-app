@@ -153,15 +153,31 @@ export const PLATFORM_STATUS = [
 /**
  * The four files the hub accepts, and nothing else.
  *
- * A fixed slot per file rather than a free filename. Two reasons: a player cannot fill the
- * bucket with a thousand objects, and there is no filename for anyone to play games with.
- * Uploading again replaces what is there. The real filename is kept in Firestore for display.
+ * A fixed slot per file rather than a free filename: a player cannot fill the database with
+ * a thousand objects, and there is no filename for anyone to play games with. Uploading
+ * again replaces what is there. The real filename is kept beside it, for display only.
+ *
+ * The passports are photos, not PDFs. That is deliberate: a photo can be shrunk on the phone
+ * until it fits, and "take a photo of the page with your face on it" is an instruction
+ * everybody can follow. A PDF cannot be shrunk, so the CV has a real ceiling and a link as
+ * the way out.
  */
 export const UPLOAD_SLOTS = {
-  passportOne: { accept: 'image/*,application/pdf', label: 'Passport photo' },
-  passportTwo: { accept: 'image/*,application/pdf', label: 'Second passport photo' },
+  passportOne: { accept: 'image/*', label: 'Passport photo' },
+  passportTwo: { accept: 'image/*', label: 'Second passport photo' },
   cv: { accept: 'application/pdf', label: 'Your CV' },
   headshot: { accept: 'image/*', label: 'Your photo' },
 };
 
-export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;   // matches storage.rules
+/**
+ * The size limits, and where they come from.
+ *
+ * Files are stored as base64 inside a Firestore document, because Firebase Storage needs the
+ * paid plan and this project stays on the free one. A Firestore document tops out at 1 MiB
+ * INCLUDING field names and overhead, and base64 makes a file about a third bigger than it
+ * started. 900,000 characters of base64 is roughly 660 KB of real file and leaves comfortable
+ * room under the ceiling.
+ */
+export const MAX_STORED_CHARS = 900000;              // ~660 KB of actual file
+export const MAX_PDF_BYTES = 640 * 1024;             // a PDF cannot be shrunk, so this is real
+export const MAX_FILE_BYTES = 25 * 1024 * 1024;      // a photo is shrunk; this just catches silly

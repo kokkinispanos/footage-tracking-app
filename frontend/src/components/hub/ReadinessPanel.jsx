@@ -1,5 +1,7 @@
-import { Check, X, Rocket } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, X, Rocket, AlertTriangle } from 'lucide-react';
 import { readiness, eligibilityHint } from '../../utils/hubCompletion';
+import { fileService } from '../../services/files';
 import { getIn } from '../../utils/nested';
 import { GlassCard } from '../ui/GlassCard';
 import { StatusPill } from '../ui/Brand';
@@ -12,8 +14,45 @@ import { cn } from '../../utils/cn';
  * is on this list because it would be nice to have. Before this existed the answer meant
  * opening the record, the Tally form and the sheet, and remembering what was in each.
  */
+/** The slots the record can claim, and where the claim lives. */
+const CLAIMS = [
+  { slot: 'passportOne', label: 'passport photo', path: ['identity', 'passportOne', 'file', 'name'] },
+  { slot: 'passportTwo', label: 'second passport photo', path: ['identity', 'passportTwo', 'file', 'name'] },
+  { slot: 'cv', label: 'CV', path: ['deliverables', 'cv', 'file', 'name'] },
+  { slot: 'headshot', label: 'headshot', path: ['deliverables', 'headshot', 'file', 'name'] },
+];
+
 export function ReadinessPanel({ record }) {
   const state = readiness(record);
+
+  /**
+   * Does the file the record claims actually exist?
+   *
+   * The record is written by the player, so "he has a passport" is his word for it until
+   * somebody looks. Four cheap reads on the page where the coach decides whether to start a
+   * campaign is a fair price for not finding out later.
+   */
+  const [ghosts, setGhosts] = useState([]);
+  const uid = record?.authUid;
+
+  // A plain string of what is claimed, so the check re-runs when the claims change and NOT
+  // on every snapshot. `record` is a fresh object each time and would re-read four documents
+  // every time the player typed a letter.
+  const claimKey = CLAIMS.map((c) => `${c.slot}:${getIn(record, c.path, '')}`).join('|');
+
+  useEffect(() => {
+    if (!uid) return undefined;
+    let cancelled = false;
+    const claimed = CLAIMS.filter((c) => claimKey.includes(`${c.slot}:`) && getIn(record, c.path, ''));
+
+    Promise.all(claimed.map(async (c) => ({ ...c, there: await fileService.exists(uid, c.slot) })))
+      .then((checked) => { if (!cancelled) setGhosts(checked.filter((c) => !c.there)); })
+      .catch(() => { /* a failed check is not evidence of anything */ });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, claimKey]);
+
   const hint = eligibilityHint(record);
   const passport = getIn(record, ['identity', 'passportOne', 'country']);
   const second = getIn(record, ['identity', 'passportTwo', 'country']);
@@ -45,6 +84,16 @@ export function ReadinessPanel({ record }) {
           </p>
         </div>
       </div>
+
+      {ghosts.length > 0 && (
+        <p className="flex items-start gap-2 text-[13px] text-error bg-error/10 border border-error/25 rounded-xl px-3.5 py-2.5">
+          <AlertTriangle className="w-4 h-4 flex-none mt-px" />
+          <span>
+            His record says he has uploaded {ghosts.map((g) => g.label).join(' and ')}, but the
+            file is not there. Ask him to add it again.
+          </span>
+        </p>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
         {state.items.map((item) => (

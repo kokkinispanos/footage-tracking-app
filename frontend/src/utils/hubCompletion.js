@@ -72,7 +72,8 @@ export function countDeliverables(record) {
   const d = record?.deliverables || {};
   let done = 0;
   if (filled(getIn(d, ['highlightReel', 'link']))) done += 1;
-  if (getIn(d, ['cv', 'file', 'name'], '')) done += 1;
+  // A file or a link. A PDF that will not fit has to have a way through.
+  if (getIn(d, ['cv', 'file', 'name'], '') || filled(getIn(d, ['cv', 'link']))) done += 1;
   if (getIn(d, ['headshot', 'file', 'name'], '')) done += 1;
   return done;
 }
@@ -247,7 +248,7 @@ export function readiness(record) {
     { key: 'gmail', label: 'Gmail for club emails', ok: filled(getIn(record, ['contact', 'gmailForClubs'])) },
     { key: 'instagram', label: 'Instagram', ok: filled(getIn(record, ['contact', 'instagram'])) },
     { key: 'reel', label: 'Highlights video', ok: filled(getIn(record, ['deliverables', 'highlightReel', 'link'])) },
-    { key: 'cv', label: 'CV', ok: !!getIn(record, ['deliverables', 'cv', 'file', 'name'], '') },
+    { key: 'cv', label: 'CV', ok: !!getIn(record, ['deliverables', 'cv', 'file', 'name'], '') || filled(getIn(record, ['deliverables', 'cv', 'link'])) },
     { key: 'headshot', label: 'Headshot', ok: !!getIn(record, ['deliverables', 'headshot', 'file', 'name'], '') },
     // The two Phase 1 sign-offs. `coachSignOff` is the coach-owned key the player cannot
     // write, so this line means what it says.

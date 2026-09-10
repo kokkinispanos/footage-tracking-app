@@ -69,6 +69,8 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
 
   const [editingReel, setEditingReel] = useState(false);
   const [reelDraft, setReelDraft] = useState('');
+  const [editingCv, setEditingCv] = useState(false);
+  const [cvDraft, setCvDraft] = useState('');
   const [signingOff, setSigningOff] = useState(false);
 
   const reelLink = getIn(data, ['highlightReel', 'link']);
@@ -78,6 +80,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
   const coach = record?.coachSignOff && typeof record.coachSignOff === 'object' ? record.coachSignOff : {};
   const reelApproved = getIn(coach, ['reelApproved', 'done'], false);
   const cvApproved = getIn(data, ['cv', 'approvedByPlayer', 'done'], false);
+  const cvLink = getIn(data, ['cv', 'link']);
   const proofPage = getIn(coach, ['proofPageLink']);
   const warning = linkWarning(reelDraft);
 
@@ -172,12 +175,52 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
           slot="cv"
           uid={uid}
           label="Your CV"
-          hint="A PDF. The one we sent you, or your own if you already had one."
+          hint="A PDF, up to 640 KB. The one we sent you, or your own if you already had one."
           value={getIn(data, ['cv', 'file'], null)}
           onChange={(file) => setPathNow(['cv', 'file'], file)}
           readOnly={readOnly}
-          isAdmin={!!adminMode}
         />
+
+        {/* A photo can be shrunk on the phone. A PDF cannot, so there has to be a way out
+            for a big one, and a CV is not an identity document. */}
+        <div className="mt-3">
+          {!readOnly && !editingCv ? (
+            <button
+              type="button"
+              onClick={() => { setCvDraft(cvLink); setEditingCv(true); }}
+              className="text-xs text-ink-faint hover:text-ink-muted transition-colors"
+            >
+              {cvLink ? 'Change the link to your CV' : 'Or paste a link to it instead'}
+            </button>
+          ) : null}
+
+          {!readOnly && editingCv && (
+            <div className="space-y-3 rounded-lg bg-black/25 border border-white/[0.07] p-3.5">
+              <TextField
+                label="Link to your CV"
+                value={cvDraft}
+                onChange={setCvDraft}
+                placeholder="https://drive.google.com/..."
+                hint="Use this if your PDF is too big to save here. Set it so anyone with the link can open it."
+              />
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
+                <Button variant="ghost" onClick={() => setEditingCv(false)}>Cancel</Button>
+                <Button onClick={() => { setPath(['cv', 'link'], normalizeUrl(cvDraft)); setEditingCv(false); }}>
+                  Save the link
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {cvLink && !editingCv && (
+            <a
+              href={cvLink} target="_blank" rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-[13px] text-brand-light hover:underline break-all"
+            >
+              <ExternalLink className="w-3 h-3 flex-none" /> {prettyUrl(cvLink)}
+            </a>
+          )}
+        </div>
         <SignOff
           label="I have read my CV and everything on it is right."
           done={cvApproved}
@@ -197,7 +240,6 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         value={getIn(data, ['headshot', 'file'], null)}
         onChange={(file) => setPathNow(['headshot', 'file'], file)}
         readOnly={readOnly}
-        isAdmin={!!adminMode}
       />
 
       {/* ------------------------------------------------------- the proof page */}

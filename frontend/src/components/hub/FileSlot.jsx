@@ -9,37 +9,26 @@ import { cn } from '../../utils/cn';
 /**
  * One file: a passport page, a CV, a photo.
  *
- * The file itself goes to Firebase Storage. What is stored in the player's record is only
- * the name, the size and the date, never a link, because a Firebase download link carries
- * its own access token and works for anyone who ever sees it. For a passport that is the
- * wrong trade, so viewing fetches the bytes with the signed-in user's own credentials and
- * throws them away when the window closes.
+ * The file lives in its own Firestore document, shrunk on the phone first. What the player's
+ * record holds is only the name, the size and the date. There is no link to the file
+ * anywhere, and there cannot be one: the only way to read it is to be signed in as its owner
+ * or as the coach, and the rules check that on every read.
  */
 
-/** Firebase's storage codes, in words a player can act on. */
+/** Firestore's codes, in words a player can act on. */
 function readableUploadError(err) {
   const code = err?.code || '';
   if (import.meta.env?.DEV) console.warn('[files]', code, err);
   switch (code) {
-    case 'storage/unauthorized':
+    case 'permission-denied':
       return 'We could not save that. Sign out, sign back in, and try again.';
-    case 'storage/canceled':
-      return 'That upload stopped. Try again.';
-    case 'storage/retry-limit-exceeded':
-    case 'storage/server-file-wrong-size':
-      // Bad signal gives this, and so does a project where file saving was never switched
-      // on. The player cannot tell those apart and should not have to, so the message covers
-      // both: try again, and tell us if trying again does not work.
-      return 'That did not go through. It might be your signal. Try again, and tell Pro '
-        + 'Placement if it keeps failing.';
-    case 'storage/quota-exceeded':
-      return 'Our storage is full. Tell Pro Placement, this one is on us.';
-    case 'storage/unknown':
-    case 'storage/project-not-found':
-    case 'storage/bucket-not-found':
-    case 'storage/invalid-argument':
-      // The common cause by far: Storage has never been switched on for the project.
-      return 'File saving is not switched on yet. Tell Pro Placement, this one is on us.';
+    case 'unavailable':
+    case 'deadline-exceeded':
+      return 'That did not go through. Check your signal and try again.';
+    case 'invalid-argument':
+      return 'That file is too big to save. Save it smaller and try again.';
+    case 'resource-exhausted':
+      return 'We have hit a limit at our end. Tell Pro Placement, this one is on us.';
     default:
       return err?.message || 'That did not work. Try again in a moment.';
   }
@@ -59,22 +48,18 @@ export function FileSlot({
   value,          // { name, size, type, uploadedAt } or nothing
   onChange,
   readOnly = false,
-  isAdmin = false,
 }) {
   const spec = UPLOAD_SLOTS[slot];
   const inputRef = useRef(null);
+  const mountedRef = useRef(true);
   const [busy, setBusy] = useState(false);
   const [percent, setPercent] = useState(0);
-  const [error, setError] = useState('');
-  const [preview, setPreview] = useState(null);   // an object URL while the viewer is open
-  const [opening, setOpening] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState(null);   // { data, type } while the viewer is open
+  const [opening, setOpening] = useState(false);
   const { confirm, dialog } = useConfirm();
 
-  // An object URL is a live handle on real bytes. Let it go the moment it is not on screen.
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-
-  const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   const pick = () => inputRef.current?.click();
@@ -91,43 +76,41 @@ export function FileSlot({
     setBusy(true);
     setPercent(0);
     setSlow(false);
-    // Nothing moving after twelve seconds usually means bad signal, or that file saving was
-    // never switched on. Either way he deserves to be told rather than watching a still bar.
+    // Nothing moving after twelve seconds usually means weak signal. Say so, rather than
+    // leaving him looking at a bar that has stopped.
     const slowTimer = setTimeout(() => setSlow(true), 12000);
     try {
       const saved = await fileService.upload(uid, slot, file, setPercent);
-      // Awaited on purpose. The file is in Storage now; until the record says so the two
-      // disagree, and the player would be looking at a screen that has forgotten his upload.
+      // Awaited on purpose. The file is saved now; until the record says so the two disagree,
+      // and he would be looking at a screen that has forgotten what he just did.
       await onChange(saved);
     } catch (err) {
-      setError(readableUploadError(err));
+      if (mountedRef.current) setError(readableUploadError(err));
     } finally {
       clearTimeout(slowTimer);
-      setSlow(false);
-      setBusy(false);
-      setPercent(0);
+      if (mountedRef.current) { setSlow(false); setBusy(false); setPercent(0); }
     }
   };
 
   const removeFile = async () => {
     const ok = await confirm({
       title: `Delete ${label.toLowerCase()}?`,
-      body: 'The file goes for good. You can always upload it again.',
+      body: 'The file goes for good. You can always add it again.',
       confirmText: 'Yes, delete it',
     });
     if (!ok) return;
     setError('');
     setBusy(true);
     try {
-      // Record first, file second. If the second half fails we are left with an object
-      // nobody points at, which is tidy-up. The other order leaves the record claiming a
-      // file that is gone, which is a lie the coach acts on.
+      // Record first, file second. If the second half fails we are left with a file nobody
+      // points at, which is tidy-up. The other order leaves the record claiming a file that
+      // is gone, which is a lie the coach acts on.
       await onChange(null);
       await fileService.remove(uid, slot);
     } catch (err) {
-      setError(readableUploadError(err));
+      if (mountedRef.current) setError(readableUploadError(err));
     } finally {
-      setBusy(false);
+      if (mountedRef.current) setBusy(false);
     }
   };
 
@@ -135,20 +118,17 @@ export function FileSlot({
     setError('');
     setOpening(true);
     try {
-      const url = await fileService.openBlobUrl(uid, slot);
-      // He navigated away while it downloaded. The URL holds real bytes and nothing is going
-      // to put it on screen now, so let it go rather than leaking it.
-      if (!mountedRef.current) { URL.revokeObjectURL(url); return; }
-      setPreview(url);
-    } catch {
-      // Reading the bytes needs CORS on the bucket. Rather than quietly minting a permanent
-      // download link instead, say so. The coach has a way in that does not weaken anything.
-      setError(isAdmin
-        ? 'This browser cannot fetch the file directly. It is saved safely. Open it in the '
-          + `Firebase console under Storage, players/${uid}/${slot}.`
-        : 'We could not open it here, but it is saved safely. Your coach can see it.');
+      const found = await fileService.open(uid, slot);
+      if (!mountedRef.current) return;
+      if (!found) {
+        setError('We cannot find that file any more. Please add it again.');
+        return;
+      }
+      setPreview(found);
+    } catch (err) {
+      if (mountedRef.current) setError(readableUploadError(err));
     } finally {
-      setOpening(false);
+      if (mountedRef.current) setOpening(false);
     }
   };
 
@@ -212,12 +192,12 @@ export function FileSlot({
           </div>
           <p className="text-xs text-ink-faint mt-1.5">
             <Loader2 className="w-3 h-3 inline animate-spin mr-1" />
-            Sending it up. {percent}% done. Keep this page open.
+            Saving it. {percent}% done. Keep this page open.
           </p>
           {slow && (
             <p className="text-xs text-warning mt-1.5 leading-relaxed">
-              This is taking a while. Your signal might be weak. If it keeps sitting here,
-              tell Pro Placement and try again later.
+              This is taking a while. Your signal might be weak. If it keeps sitting here, try
+              again later or tell Pro Placement.
             </p>
           )}
         </div>
@@ -240,15 +220,15 @@ export function FileSlot({
       {preview && (
         <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <button
-            onClick={() => { URL.revokeObjectURL(preview); setPreview(null); }}
+            onClick={() => setPreview(null)}
             aria-label="Close"
             className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 text-ink hover:bg-white/20 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
-          {value?.type === 'application/pdf'
-            ? <iframe title={label} src={preview} className="w-full h-full max-w-4xl rounded-xl bg-white" />
-            : <img alt={label} src={preview} className="max-w-full max-h-full rounded-xl object-contain" />}
+          {preview.type === 'application/pdf'
+            ? <iframe title={label} src={preview.data} className="w-full h-full max-w-4xl rounded-xl bg-white" />
+            : <img alt={label} src={preview.data} className="max-w-full max-h-full rounded-xl object-contain" />}
         </div>
       )}
     </div>

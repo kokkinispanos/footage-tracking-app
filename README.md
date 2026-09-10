@@ -19,10 +19,9 @@ Give / show / do.
 
 ```
 firestore.rules          THE SECURITY OF THE APP. Read this before changing anything.
-storage.rules            Passport / CV / headshot uploads: owner and admin only.
 firebase.json            So `firebase deploy --only firestore:rules` works if the CLI is installed.
 MIGRATION.md             The console steps to switch sign-in on and close the database.
-rules-tests/             76 tests that PROVE firestore.rules does what it says. `npm test`.
+rules-tests/             93 tests that PROVE firestore.rules does what it says. `npm test`.
 AUDIT_2026-09-08.md      Where this all came from: what was broken and what is planned.
 frontend/
   dev.mjs                Starts Vite with the right working directory (the path has spaces).
@@ -42,7 +41,7 @@ frontend/
     utils/hubCatalog.js     Every question the hub asks: countries, consents, platforms, slots.
     utils/hubCompletion.js  What "done" means for the five sections about the player.
     utils/nested.js         Reading and writing `identity.passportOne.country` safely.
-    services/files.js       The four uploads. Loaded on demand, never mints a download URL.
+    services/files.js       The four uploads. Shrunk on the phone, stored in Firestore.
     components/dashboard/   The five footage sections + next-step card, phone nav, shell, row
     components/hub/         The five sections about the player + the coach's readiness panel
     components/ui/          Buttons, inputs, cards, modal, brand marks
@@ -64,6 +63,12 @@ Vercel builds `frontend/`.
 
 **Rules are not deployed by a push.** They live in the Firebase console. See `MIGRATION.md`.
 
+## The plan this runs on
+
+Firebase **Spark**, the free one. Nothing in this app needs billing and nothing should be added
+that does. That rules out Firebase Storage, Cloud Functions and scheduled jobs. If a feature
+seems to need one of them, look for the version that does not before you look at the invoice.
+
 ## Testing the rules
 
 ```bash
@@ -72,7 +77,7 @@ npm install
 npm test
 ```
 
-Starts the Firestore emulator (needs Java), runs `firestore.rules` against 76 cases and exits
+Starts the Firestore emulator (needs Java), runs `firestore.rules` against 93 cases and exits
 non-zero if any of them lets something through. **Run this before changing the rules and after.**
 The rules are the only thing standing between a signed-in player and everyone else's data; a
 comment saying they work is not evidence.
@@ -96,14 +101,14 @@ comment saying they work is not evidence.
 - **`profile.lastSeenAt` lives inside `profile`.** It would read better as a top-level field, but
   the rules only let a player write the named sections — a new top-level key would be refused.
   Nested keeps it legal without redeploying rules.
-- **A file is stored under a fixed slot name, never a filename the player chose.** There are
-  exactly four: `passportOne`, `passportTwo`, `cv`, `headshot`, and `storage.rules` refuses
-  anything else. Uploading again replaces. A free path lets one player fill the bucket, and a
-  free filename is a string an attacker controls that something later renders.
-- **Nothing ever stores a Firebase download URL for a passport.** That link carries its own
-  access token and keeps working for anyone who ever sees it, whatever the rules say later.
-  Viewing fetches the bytes with the signed-in user's credentials into a blob that is revoked
-  when the window closes. If you need to render an upload somewhere new, do it that way too.
+- **Files live in Firestore, not Firebase Storage, and that is on purpose.** Storage needs the
+  paid plan, which this project does not have. It is also the weaker option: a Storage download
+  link carries its own access token and keeps working for anyone who ever sees it. A Firestore
+  document has no link, so the rules are consulted on every read of a passport. Photos are shrunk
+  on the phone to fit the 1 MiB document ceiling; a PDF that will not fit asks for a link instead.
+- **A file is stored under a fixed slot, never a name the player chose.** Exactly four:
+  `passportOne`, `passportTwo`, `cv`, `headshot`, in `playerFiles/<uid>__<slot>`, one document
+  each so the coach's list never drags a passport photo along with a row of names.
 - **`authEmail` is not the same field as `profile.email`, and the difference matters.** The
   player writes `profile.email`; `authEmail` can only be written to the address Firebase says he
   is signed in as and has confirmed. Anything that decides who gets access to what — carrying an

@@ -1,18 +1,23 @@
 # Go-live steps for the rebuilt sign-in — read this once, do it once
 
-> ## ⚠ TWO CONSOLE STEPS, 2026-09-10 (checkpoint 3). About five minutes.
+> ## ⚠ ONE CONSOLE STEP, 2026-09-10. Two minutes. No billing, ever.
 >
-> **1. Switch Storage on.** Firebase console → **Storage** → **Get started** → accept the
-> default location → then **Rules** → select all → paste the whole of `storage.rules` →
-> **Publish**. Until you do this, the passport, CV and photo uploads cannot work at all.
-> Nothing else in the app is affected.
+> **Republish `firestore.rules`.** Firestore → Rules → select all → paste the whole file →
+> Publish. That is the only thing standing between now and giving the link to your players.
 >
-> **2. Republish `firestore.rules` again.** Same as before: Firestore → Rules → select all
-> → paste the whole file → Publish. The five new hub sections are now type checked, the
-> same way the footage ones are, so one player cannot store a broken record that takes your
-> whole player list down.
+> **Firebase Storage is not used and never will be.** It needs the paid Blaze plan, you said
+> no, and you were right to. The uploads were rebuilt to store the file inside Firestore
+> instead: the photo is shrunk on the player's own phone before it is sent, and each file
+> lives in its own document that only he and you can open.
 >
-> Do both before you send the link to anybody.
+> That is genuinely the safer design, not a consolation prize. A Storage download link
+> carries its own access token and keeps working for anyone who ever sees it, whatever the
+> rules say later. A Firestore document has no link at all, so the rules are asked again on
+> every single read of a passport, forever.
+>
+> The cost is a size ceiling. A photo of a passport page comes out around 185 KB after being
+> shrunk, well under the limit, and an eleven megabyte phone photo of pure noise still fits.
+> A CV PDF cannot be shrunk, so if it is over 640 KB the app asks for a link instead.
 
 > ## ⚠ UPDATE, 2026-09-09 (checkpoint 2): republish `firestore.rules`
 >
