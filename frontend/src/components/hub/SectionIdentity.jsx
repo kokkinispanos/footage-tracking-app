@@ -98,6 +98,7 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
           value={getIn(data, ['passportOne', 'file'], null)}
           onChange={(file) => setPath(['passportOne', 'file'], file)}
           readOnly={readOnly}
+          isAdmin={!!adminMode}
         />
       </div>
 
@@ -134,6 +135,7 @@ export function SectionIdentity({ adminMode, overrideData, adminDocId, adminNote
               value={getIn(data, ['passportTwo', 'file'], null)}
               onChange={(file) => setPath(['passportTwo', 'file'], file)}
               readOnly={readOnly}
+              isAdmin={!!adminMode}
             />
           )}
         </div>

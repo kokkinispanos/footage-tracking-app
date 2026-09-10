@@ -276,10 +276,110 @@ Its opening line was "do not ship the legacy-record linking flow as written", an
 - Submit-for-review and approve / needs-redo — Panos dropped them; feedback goes through Skool.
 - Deadlines. The app does not know a player's, and a made-up one is worse than none.
 
-## Checkpoint 3 — the hub
+## Checkpoint 3 — the hub itself (2026-09-10) ✅ DONE
 
-Sections A–E from `AUDIT_2026-09-08.md` §5c, the passport / CV / headshot uploads, and the
-readiness panel. Videos stay links; documents become uploads.
+**What this stage was for:** the app held a player's footage. Everything else about him lived
+in a Tally form, a spreadsheet cell, a folder, or somebody's head. This is the stage that makes
+the sentence true: everything about you goes in one place.
+
+### Done
+
+**Two tabs, not one page.** "My footage" is the original five sections. "About me" is the five
+new ones. Ten sections in a single scroll is a wall, and a wall is where a sixteen year old on
+a phone gives up. The phone bar shows the five of whichever tab he is on.
+
+**A. Who you are** (`SectionIdentity`)
+- Birthday from a date picker, never free text: Stage 3's age gate fails on a typed date.
+- Passport country and expiry, plus a photo of it. A second passport the same way.
+- **The family question, in a box of its own with an explanation.** "Was your mum, dad, or a
+  grandparent born in Europe?" Almost nobody volunteers this, because nobody tells them it
+  matters. It is the answer that turned a Lane B player into a possible Lane A in the wave-3
+  test, and it changes the entire list of clubs he can be sent to.
+- Work status, and the three consents, each stored with the date he ticked it.
+- A line at the top that reads his answers back: EU passport, family link, or "you may need a
+  visa, that is normal and we work around it".
+
+**B. Your numbers** (`SectionPlayerCard`)
+- Height, weight, foot, club, level, signed or free, contract end, when he can join.
+- Languages as tappable tags with room to add his own.
+- **Measured numbers as one box each with the unit printed on it**, and different boxes for a
+  keeper. They used to be one free text field, and a real player's cell read `Top Speed/ 32
+  km/hour, Distance sprint: 120m 13seconds, 7 saves avr per game, 6 foot 7 tall`. That went in
+  front of clubs. The box also says: only put in numbers somebody actually measured.
+- Season by season rows, achievements, his own history, and his own draft of the one-line
+  headline and the short summary.
+
+**C. How we reach you** (`SectionContact`)
+- Phone with country code, WhatsApp, Instagram, Transfermarkt.
+- **The Gmail Stage 3 sends club emails from**, in its own box with the reason next to it.
+- Whoever is paying, name and email, tied to the consent above.
+
+**D. Your finished stuff** (`SectionDeliverables`)
+- The reel as a link, with the coach's sign-off. The CV as an upload, with the player's.
+  Those two ticks are Phase 1 exit criteria (`phase1_foundation.md` §8) and there was nowhere
+  in the world they were recorded. Each records who ticked it and when, and neither side can
+  move the other's.
+- The headshot, and the proof page link once it exists (the coach sets that one).
+
+**E. Where people can find you** (`SectionPlatforms`)
+- Fourteen rows: Transfermarkt, Wyscout, Soccerway, aiScout, Tonsser, Skouted, Veo, Hudl,
+  Instagram, YouTube, TikTok, X, LinkedIn, Facebook. Each is Done / Not yet / Not for me, and
+  Done reveals a box for the link.
+- Closes the gap `phase2_visibility.md` line 211 names in Panos's own words: "No internal
+  tracker for which platforms each client is live on, currently tribal knowledge per client
+  folder." "Not for me" is stored, so a blank row means nobody has looked yet.
+
+**Uploads** (`services/files.js`, `components/hub/FileSlot.jsx`)
+- Four fixed slots: `passportOne`, `passportTwo`, `cv`, `headshot`. No free filenames and one
+  object per slot, so re-uploading replaces and nobody can fill the bucket. `storage.rules`
+  enforces the same list.
+- Firestore stores the name, size, type and date. **Never a URL.** A Firebase download link
+  carries its own access token and keeps working for anyone who ever sees it, whatever the
+  rules say afterwards, which is the wrong trade for a passport. Viewing fetches the bytes with
+  the signed-in user's own credentials into a blob that is revoked when the window closes.
+- The first bytes of the file are checked against what it claims to be, so a renamed video is
+  caught before it costs somebody twelve minutes on a ground's wifi.
+- `firebase/storage` is imported the first time he picks a file, not on every page load.
+
+**The coach's side**
+- A **readiness panel** on the player page: eleven lines, every one a column the outreach
+  engine reads or a permission it needs. "Is he ready for the attack?" is now a glance.
+- It reads his eligibility answers back and says plainly: this is what he told us, check the
+  passport photo yourself before it decides a lane.
+- The player list gains a "ready for Stage 3" count, a per-row pill, and a "closest to Stage 3
+  first" sort.
+- All five new sections are readable on the admin page, read-only, with a notes box each.
+
+**Rules**
+- The five hub sections are type checked like the footage ones, so one malformed record cannot
+  take the whole player list down. **`firestore.rules` needs republishing.**
+- `storage.rules` rewritten from `{allPaths=**}` to the four named slots. **Needs publishing,
+  and Storage needs switching on at all.**
+- Rule tests: **67, all passing**, including that a hub section cannot be a string or a list,
+  that the coach can tick a sign-off and set the proof page, and that a player still cannot
+  touch another player's hub sections.
+
+**Copy**
+- Every word a player reads is rewritten short and plain, for someone tired, on a phone, who
+  does not enjoy reading. No em dash survives in any rendered string.
+
+### Verified
+- Build and lint clean (0 errors, 2 known fast-refresh warnings).
+- The completion maths run against an empty record, a half-filled one, a fully filled one and a
+  deliberately malformed one: correct counts, nothing throws. "Not for me" correctly does not
+  count as progress; an EU passport changes the eligibility line.
+- Driven in the browser through a throwaway harness: ticking the three consents moved the
+  section from 5/6 to 6/6 and the tab total with it; marking platforms Done revealed their link
+  boxes and moved the count; adding a season added a row; the readiness panel read 6 of 11 and
+  listed exactly what was missing. No console errors. The harness was removed again.
+- **Not verified: uploading a file.** Storage has never been switched on for this project, so
+  no upload path can be exercised until Panos does that. The code, the rules and the error
+  messages are written; the round trip is untested.
+
+### Not done on purpose
+- The CV generator. That is checkpoint 4 and it is a tool for Panos, not something a player
+  needs.
+- "Send to Stage 3". Parked until the app has been used in anger.
 
 ## Checkpoint 4 — the CV generator
 

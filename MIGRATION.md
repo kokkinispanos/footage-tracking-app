@@ -1,5 +1,19 @@
 # Go-live steps for the rebuilt sign-in — read this once, do it once
 
+> ## ⚠ TWO CONSOLE STEPS, 2026-09-10 (checkpoint 3). About five minutes.
+>
+> **1. Switch Storage on.** Firebase console → **Storage** → **Get started** → accept the
+> default location → then **Rules** → select all → paste the whole of `storage.rules` →
+> **Publish**. Until you do this, the passport, CV and photo uploads cannot work at all.
+> Nothing else in the app is affected.
+>
+> **2. Republish `firestore.rules` again.** Same as before: Firestore → Rules → select all
+> → paste the whole file → Publish. The five new hub sections are now type checked, the
+> same way the footage ones are, so one player cannot store a broken record that takes your
+> whole player list down.
+>
+> Do both before you send the link to anybody.
+
 > ## ⚠ UPDATE, 2026-09-09 (checkpoint 2): republish `firestore.rules`
 >
 > The rules changed and the new ones must be published before you carry any old record

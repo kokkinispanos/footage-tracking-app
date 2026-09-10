@@ -76,6 +76,9 @@ export const fileService = {
    * Returns what to store in Firestore: never a URL, only what the screen needs to show.
    */
   async upload(uid, slot, file, onProgress) {
+    // Without an owner id the path would be `players/undefined/...`, which the rules refuse
+    // anyway. Failing here gives a sentence instead of a Firebase code.
+    if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
     if (!UPLOAD_SLOTS[slot]) throw new Error(`Unknown slot "${slot}"`);
     const problem = fileProblem(file, slot);
     if (problem) throw new Error(problem);
@@ -130,6 +133,7 @@ export const fileService = {
    * caller says so plainly rather than quietly falling back to minting a permanent URL.
    */
   async openBlobUrl(uid, slot) {
+    if (!uid) throw new Error('We do not know who you are yet. Reload the page and try again.');
     const api = await storageApi();
     const blob = await api.getBlob(api.ref(await bucket(), pathFor(uid, slot)));
     return URL.createObjectURL(blob);

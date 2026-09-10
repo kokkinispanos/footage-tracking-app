@@ -39,7 +39,12 @@ frontend/
     utils/export.js         The link sheet for the editor, and his raw data.
     utils/links.js          Link tidying and the mistakes we can actually catch.
     pages/                  Login, SignUp, ForgotPassword, Dashboard, Account, Admin*
+    utils/hubCatalog.js     Every question the hub asks: countries, consents, platforms, slots.
+    utils/hubCompletion.js  What "done" means for the five sections about the player.
+    utils/nested.js         Reading and writing `identity.passportOne.country` safely.
+    services/files.js       The four uploads. Loaded on demand, never mints a download URL.
     components/dashboard/   The five footage sections + next-step card, phone nav, shell, row
+    components/hub/         The five sections about the player + the coach's readiness panel
     components/ui/          Buttons, inputs, cards, modal, brand marks
 ```
 
@@ -91,6 +96,14 @@ comment saying they work is not evidence.
 - **`profile.lastSeenAt` lives inside `profile`.** It would read better as a top-level field, but
   the rules only let a player write the named sections — a new top-level key would be refused.
   Nested keeps it legal without redeploying rules.
+- **A file is stored under a fixed slot name, never a filename the player chose.** There are
+  exactly four: `passportOne`, `passportTwo`, `cv`, `headshot`, and `storage.rules` refuses
+  anything else. Uploading again replaces. A free path lets one player fill the bucket, and a
+  free filename is a string an attacker controls that something later renders.
+- **Nothing ever stores a Firebase download URL for a passport.** That link carries its own
+  access token and keeps working for anyone who ever sees it, whatever the rules say later.
+  Viewing fetches the bytes with the signed-in user's credentials into a blob that is revoked
+  when the window closes. If you need to render an upload somewhere new, do it that way too.
 - **`authEmail` is not the same field as `profile.email`, and the difference matters.** The
   player writes `profile.email`; `authEmail` can only be written to the address Firebase says he
   is signed in as and has confirmed. Anything that decides who gets access to what — carrying an
@@ -99,6 +112,16 @@ comment saying they work is not evidence.
 - **Changing an email uses `verifyBeforeUpdateEmail`, not `updateEmail`.** The confirmation goes
   to the new address, so a typo cannot lock a player out of his own account. It is also the only
   variant that still works with email-enumeration protection switched on.
+
+## What the player actually sees
+
+Two tabs. **My footage** is the five sections of links he sends us. **About me** is the five
+about him: who he is, his numbers, how we reach him, his finished work, and where he is already
+online. Ten sections in one scroll is a wall, and a wall is where a sixteen year old on a phone
+gives up.
+
+Every word he reads is written short and plain, on purpose. Assume it is being read on a phone,
+at night, by someone tired. No em dashes anywhere in rendered text.
 
 ## Who is an admin
 

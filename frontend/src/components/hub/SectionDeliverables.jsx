@@ -172,6 +172,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
           value={getIn(data, ['cv', 'file'], null)}
           onChange={(file) => setPath(['cv', 'file'], file)}
           readOnly={readOnly}
+          isAdmin={!!adminMode}
         />
         <SignOff
           label="I have read my CV and everything on it is right."
@@ -192,6 +193,7 @@ export function SectionDeliverables({ adminMode, overrideData, adminDocId, admin
         value={getIn(data, ['headshot', 'file'], null)}
         onChange={(file) => setPath(['headshot', 'file'], file)}
         readOnly={readOnly}
+        isAdmin={!!adminMode}
       />
 
       {/* ------------------------------------------------------- the proof page */}

@@ -51,6 +51,7 @@ export function FileSlot({
   value,          // { name, size, type, uploadedAt } or nothing
   onChange,
   readOnly = false,
+  isAdmin = false,
 }) {
   const spec = UPLOAD_SLOTS[slot];
   const inputRef = useRef(null);
@@ -113,7 +114,12 @@ export function FileSlot({
     try {
       setPreview(await fileService.openBlobUrl(uid, slot));
     } catch {
-      setError('We could not open that here. It is still saved safely.');
+      // Reading the bytes needs CORS on the bucket. Rather than quietly minting a permanent
+      // download link instead, say so. The coach has a way in that does not weaken anything.
+      setError(isAdmin
+        ? 'This browser cannot fetch the file directly. It is saved safely. Open it in the '
+          + `Firebase console under Storage, players/${uid}/${slot}.`
+        : 'We could not open it here, but it is saved safely. Your coach can see it.');
     } finally {
       setOpening(false);
     }
