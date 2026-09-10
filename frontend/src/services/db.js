@@ -178,6 +178,34 @@ export const dbService = {
     });
   },
 
+  /**
+   * The coach ticking "this reel is ready to send to clubs".
+   *
+   * One of the five Phase 1 exit criteria, and until now there was nowhere it was written
+   * down. It lives on the player's own record rather than in the admin-only collection so
+   * that HE can see it: knowing the reel is signed off is the point of signing it off.
+   *
+   * That does mean a player determined enough to open a console could flip his own tick.
+   * It is a marker in a conversation, not a permission, and nothing automatic keys off it,
+   * so the honest trade is to let him see it. If it ever gates a real action, move it.
+   */
+  async setCoachSignOff(docId, done) {
+    await updateDoc(doc(db, 'players', docId), {
+      'deliverables.highlightReel.approvedByCoach': done
+        ? { done: true, at: new Date().toISOString() }
+        : { done: false, at: '' },
+      updatedAt: serverTimestamp(),
+    });
+  },
+
+  /** The read-only link to the page clubs get sent. The coach sets it; the player sees it. */
+  async setProofPage(docId, link) {
+    await updateDoc(doc(db, 'players', docId), {
+      'deliverables.proofPage.link': (link || '').trim(),
+      updatedAt: serverTimestamp(),
+    });
+  },
+
   // ---------------------------------------------------------------- admin only
 
   async getAllPlayers() {

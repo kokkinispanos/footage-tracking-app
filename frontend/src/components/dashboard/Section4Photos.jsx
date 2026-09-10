@@ -32,8 +32,8 @@ export function Section4Photos({ adminMode, overrideData, adminDocId, adminNotes
     <SectionShell
       icon={ImageIcon}
       index={4}
-      title="Photographs"
-      description="Six photos. High resolution, ones you have the right to use. How you look on paper is the first thing a sporting director judges."
+      title="Your photos"
+      description="Six photos, as big and clear as you can get them. Only ones you are allowed to use. These are the first thing a club sees of you."
       count={countPhotos(playerData)}
       target={TARGETS.photos}
     >

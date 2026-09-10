@@ -35,7 +35,7 @@ export function ForgotPassword() {
     return (
       <AuthLayout
         title="Check your email"
-        subtitle={`If there is an account for ${email}, a link to set a new password is on its way. It can take a minute, and it may land in spam.`}
+        subtitle={`If ${email} has an account, a link is on its way. Give it a minute. Check your spam folder too.`}
         footer={<Link to="/login" className="text-brand-light hover:underline font-medium">Back to sign in</Link>}
       >
         <div className="flex flex-col items-center text-center py-4">
@@ -53,7 +53,7 @@ export function ForgotPassword() {
   return (
     <AuthLayout
       title="Forgot your password?"
-      subtitle="Type your email and we will send you a link to set a new one."
+      subtitle="Type your email. We will send you a link to make a new one."
       footer={<Link to="/login" className="text-brand-light hover:underline font-medium">Back to sign in</Link>}
     >
       <form onSubmit={submit} className="space-y-4" noValidate>

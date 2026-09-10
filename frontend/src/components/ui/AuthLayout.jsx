@@ -25,7 +25,7 @@ export function AuthLayout({ title, subtitle, children, footer }) {
         )}
 
         <p className="mt-8 text-center text-[11px] text-ink-faint leading-relaxed">
-          Private to Pro Placement clients. Your information is only visible to you and your coach.
+          Only Pro Placement players use this. Nobody sees your stuff except you and your coach.
         </p>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Check, AlertTriangle, FileText, Copy, Pencil, Clock } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../context/AuthContext';
-import { calculateCompletion } from '../utils/completion';
+import { calculateEverything } from '../utils/hubCompletion';
 import { describeActivity, humanAge, fullDate, lastSavedMs, lastSeenMs } from '../utils/activity';
 import { downloadLinkSheet, downloadRawJson, copyLinkSheet } from '../utils/export';
 import { POSITIONS } from '../utils/catalog';
@@ -20,6 +20,13 @@ import { Section2TopClips } from '../components/dashboard/Section2TopClips';
 import { Section3SkillClips } from '../components/dashboard/Section3SkillClips';
 import { Section4Photos } from '../components/dashboard/Section4Photos';
 import { Section5Drive } from '../components/dashboard/Section5Drive';
+
+import { SectionIdentity } from '../components/hub/SectionIdentity';
+import { SectionPlayerCard } from '../components/hub/SectionPlayerCard';
+import { SectionContact } from '../components/hub/SectionContact';
+import { SectionDeliverables } from '../components/hub/SectionDeliverables';
+import { SectionPlatforms } from '../components/hub/SectionPlatforms';
+import { ReadinessPanel } from '../components/hub/ReadinessPanel';
 
 export function AdminPlayerDetail() {
   const { id } = useParams();
@@ -139,7 +146,7 @@ export function AdminPlayerDetail() {
     );
   }
 
-  const stats = calculateCompletion(playerData);
+  const stats = calculateEverything(playerData);
   const activity = describeActivity(playerData);
   const savedMs = lastSavedMs(playerData);
   const seenMs = lastSeenMs(playerData);
@@ -225,7 +232,7 @@ export function AdminPlayerDetail() {
                 </select>
               </div>
               <p className="text-xs text-ink-faint">
-                His email is not editable here — it is his sign-in identity, and changing the copy
+                His email is not editable here. It is his sign-in identity, and changing the copy
                 on this record would only make the two disagree. He changes it from his own account
                 page, which sends a confirmation link to the new address.
               </p>
@@ -276,12 +283,20 @@ export function AdminPlayerDetail() {
           </p>
         </GlassCard>
 
+        <ReadinessPanel record={playerData} />
+
         <div className="space-y-5">
           <Section1FullGames {...shared} />
           <Section2TopClips {...shared} />
           <Section3SkillClips {...shared} />
           <Section4Photos {...shared} />
           <Section5Drive {...shared} />
+
+          <SectionIdentity {...shared} />
+          <SectionPlayerCard {...shared} />
+          <SectionContact {...shared} />
+          <SectionDeliverables {...shared} />
+          <SectionPlatforms {...shared} />
         </div>
       </main>
     </div>

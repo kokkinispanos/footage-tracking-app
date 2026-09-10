@@ -1,23 +1,17 @@
-import { Video, Star, Film, Image as ImageIcon, FolderUp } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 /**
  * Sticky section jump, phones only.
  *
- * He films on his phone and the hub is five long sections; without this, getting from the
- * photos back to the full games is a lot of thumb. Each button shows whether that section is
- * finished, so the bar doubles as the checklist. Asked for in the app guidelines
+ * He films on his phone and each tab is five long sections; without this, getting from the
+ * photos back to the full games is a lot of thumb. Each button shows whether that section
+ * is finished, so the bar doubles as the checklist. Asked for in the app guidelines
  * ("sticky bottom navigation") and missing until now.
+ *
+ * It shows the sections of the tab he is actually on. Ten icons across a phone would be
+ * unreadable, and he does not need the other five while he is working on these.
  */
-const ITEMS = [
-  { anchor: 'full-games', key: 'fullGames', icon: Video, label: 'Games' },
-  { anchor: 'top-clips', key: 'topThreeClips', icon: Star, label: 'Top 3' },
-  { anchor: 'skill-clips', key: 'skillClips', icon: Film, label: 'Skills' },
-  { anchor: 'photos', key: 'photos', icon: ImageIcon, label: 'Photos' },
-  { anchor: 'drive-folder', key: 'driveFolder', icon: FolderUp, label: 'Drive' },
-];
-
-export function SectionNav({ stats, onGo }) {
+export function SectionNav({ items, stats, onGo }) {
   const doneFor = (key) => stats?.sections?.find((s) => s.key === key)?.complete;
 
   return (
@@ -27,7 +21,7 @@ export function SectionNav({ stats, onGo }) {
                  bg-background/95 backdrop-blur-xl safe-bottom"
     >
       <ul className="flex">
-        {ITEMS.map(({ anchor, key, icon: Icon, label }) => {
+        {items.map(({ anchor, key, icon: Icon, label }) => {
           const complete = doneFor(key);
           return (
             <li key={anchor} className="flex-1">

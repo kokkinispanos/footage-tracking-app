@@ -43,7 +43,7 @@ export function SignUp() {
   return (
     <AuthLayout
       title="Create your account"
-      subtitle="This is where everything about you lives: your footage, your documents, your numbers."
+      subtitle="One place for everything about you. Your games, your papers, your numbers."
       footer={
         <>
           Already have an account?{' '}
@@ -59,7 +59,7 @@ export function SignUp() {
           value={form.fullName}
           onChange={change}
           required
-          placeholder="As it appears on your passport"
+          placeholder="Spell it like your passport does"
         />
 
         <Input
@@ -72,7 +72,7 @@ export function SignUp() {
           onChange={change}
           required
           placeholder="you@example.com"
-          hint="Use an email you check. We send everything here."
+          hint="Use one you actually check. Everything comes here."
         />
 
         <div>
@@ -122,7 +122,7 @@ export function SignUp() {
             ))}
           </select>
           <span className="text-xs text-ink-faint">
-            This decides which skill categories you are asked for. You can change it later.
+            This changes which skill clips we ask you for. You can change it later.
           </span>
         </div>
 

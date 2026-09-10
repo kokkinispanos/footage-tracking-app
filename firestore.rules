@@ -133,6 +133,11 @@ service cloud.firestore {
         return profileOk()
           && listOk('fullGames') && listOk('topThreeClips')
           && mapOk('skillClips') && mapOk('photos') && mapOk('driveFolder')
+          // The five hub sections. Same reason as the footage ones: the coach's page renders
+          // every player at once, so one record holding a string where a map belongs would
+          // take the whole list down.
+          && mapOk('identity') && mapOk('playerCard') && mapOk('contact')
+          && mapOk('deliverables') && mapOk('platforms')
           && (!('authEmail' in request.resource.data) || request.resource.data.authEmail is string);
       }
 

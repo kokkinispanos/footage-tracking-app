@@ -36,8 +36,8 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
     <SectionShell
       icon={FolderUp}
       index={5}
-      title="Your master Drive folder"
-      description="One folder holding everything, shared so anyone with the link can view it. This is what your editor opens to build your reel."
+      title="Your main Drive folder"
+      description="One folder with all of it inside. Share it so anyone with the link can open it. This is the folder your editor works from."
       count={isFilled ? 1 : 0}
       target={1}
     >
@@ -45,13 +45,13 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
         {!adminMode && isEditing ? (
           <div className="space-y-3">
             <Input
-              label="Paste the shared folder link"
+              label="Paste the folder link"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="https://drive.google.com/drive/folders/..."
               autoFocus
               error={draft && warning ? warning : undefined}
-              hint="In Drive: right-click the folder, Share, then Copy link. Set it to 'Anyone with the link'."
+              hint="In Drive: right click the folder, tap Share, then Copy link. Change it to 'Anyone with the link'."
             />
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
               <Button variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
@@ -65,7 +65,7 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
                 <>
                   <div className="flex items-center gap-2 mb-1.5">
                     <CheckCircle2 className="w-4 h-4 text-success flex-none" />
-                    <span className="font-medium text-ink text-sm">Folder linked</span>
+                    <span className="font-medium text-ink text-sm">Folder added</span>
                   </div>
                   <a
                     href={link}
@@ -81,7 +81,7 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
                 <>
                   <span className="font-medium text-ink text-sm block mb-1">No folder yet</span>
                   <span className="text-[13px] text-ink-muted">
-                    Add it once your folders match the list below.
+                    Add it once the folders inside match the list below.
                   </span>
                 </>
               )}
@@ -102,7 +102,7 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
 
       <div className="rounded-xl bg-brand/[0.06] border border-brand/20 p-4">
         <h4 className="text-[13px] font-semibold text-brand-light mb-2.5">
-          Name your subfolders exactly like this
+          Name the folders inside it exactly like this
         </h4>
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
           {SUBFOLDERS.map((name) => (

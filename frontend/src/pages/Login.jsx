@@ -32,7 +32,7 @@ export function Login() {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to your player hub."
+      subtitle="Sign in to your hub."
       footer={
         <>
           New to the program?{' '}

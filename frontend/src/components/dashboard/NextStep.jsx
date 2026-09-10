@@ -1,17 +1,18 @@
 import { ArrowRight, PartyPopper, Target } from 'lucide-react';
-import { nextStep, weeksSinceStart } from '../../utils/completion';
+import { nextThing } from '../../utils/hubCompletion';
+import { weeksSinceStart } from '../../utils/completion';
 import { Button } from '../ui/Button';
 
 /**
  * One instruction, not a list.
  *
- * The audit's complaint was that nothing tells a player what to do — he sees a percentage and
- * five half-full sections and closes the tab. This says the single next thing and takes him
- * to it. No deadline, because the app does not know his: "week 3" is a fact, "you are late"
- * would be a guess.
+ * The audit's complaint was that nothing tells a player what to do: he sees a percentage
+ * and ten half-full sections and closes the tab. This says the single next thing and takes
+ * him to it, switching tab if it lives on the other one. No deadline, because the app does
+ * not know his. "Week 3" is a fact; "you are late" would be a guess.
  */
 export function NextStep({ playerData, onGo }) {
-  const step = nextStep(playerData);
+  const step = nextThing(playerData);
   const week = weeksSinceStart(playerData);
 
   if (step.done) {
@@ -40,11 +41,7 @@ export function NextStep({ playerData, onGo }) {
             <span className="text-[11px] uppercase tracking-wider text-brand-light font-semibold">
               Do this next
             </span>
-            {week && (
-              <span className="text-[11px] text-ink-faint">
-                · week {week} of your hub
-              </span>
-            )}
+            {week && <span className="text-[11px] text-ink-faint">· week {week} for you</span>}
           </div>
           <h2 className="font-semibold text-ink mt-1">{step.title}</h2>
           <p className="text-[13px] text-ink-muted mt-1 leading-relaxed">{step.body}</p>
@@ -53,7 +50,7 @@ export function NextStep({ playerData, onGo }) {
             size="sm"
             variant="secondary"
             className="mt-3.5 gap-1.5"
-            onClick={() => onGo?.(step.anchor)}
+            onClick={() => onGo?.(step.anchor, step.tab)}
           >
             Take me there <ArrowRight className="w-3.5 h-3.5" />
           </Button>

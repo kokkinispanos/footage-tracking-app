@@ -82,8 +82,8 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
     <SectionShell
       icon={Film}
       index={3}
-      title="Skill clips"
-      description="Short moments, 6 to 13 seconds each, filed by what they show. Repeat your strongest skill 5 or 6 times — repetition is what makes a scout believe it."
+      title="Your skill clips"
+      description="Short clips, about 6 to 13 seconds each, sorted by what they show. Show your best skill five or six times. Once looks like luck. Six times looks like you."
       count={total}
       target={TARGETS.skillClips}
     >
@@ -165,7 +165,7 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
         <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? `Edit ${activeLabel} clip` : `Add a ${activeLabel} clip`}>
           <form onSubmit={save} className="space-y-4">
             <Input
-              label="Link to the clip"
+              label="Paste the link"
               placeholder="https://drive.google.com/..."
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
@@ -179,7 +179,7 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
                 id="sc-notes"
                 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink placeholder:text-ink-faint
                            focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 min-h-[88px] transition-all"
-                placeholder="e.g. 50-yard cross-field pass, straight to his feet."
+                placeholder="Long ball across the pitch, straight to his feet."
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />

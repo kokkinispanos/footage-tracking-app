@@ -3,10 +3,15 @@ import { cn } from '../../utils/cn';
 
 const LABELS = {
   fullGames: 'Full games',
-  topThreeClips: 'Top 3 clips',
+  topThreeClips: 'Best 3 clips',
   skillClips: 'Skill clips',
   photos: 'Photos',
   driveFolder: 'Drive folder',
+  identity: 'Who you are',
+  playerCard: 'Your numbers',
+  contact: 'Contact',
+  deliverables: 'Finished stuff',
+  platforms: 'Online',
 };
 
 const BAR_TONE = {
@@ -24,14 +29,14 @@ export function ProgressPanel({ stats }) {
         <div className="flex items-end justify-between mb-4 gap-4">
           <div>
             <div className="text-[11px] uppercase tracking-[0.16em] text-ink-faint font-medium mb-1.5">
-              Your progress
+              How far you are
             </div>
             <div className="text-3xl font-semibold tabular-nums">
               {stats.percent}<span className="text-ink-faint text-xl">%</span>
             </div>
           </div>
           <div className="text-sm text-ink-muted text-right">
-            <span className="text-ink font-medium tabular-nums">{stats.done}</span> of {stats.total} pieces in place
+            <span className="text-ink font-medium tabular-nums">{stats.done}</span> of {stats.total} things done
           </div>
         </div>
 
@@ -41,7 +46,7 @@ export function ProgressPanel({ stats }) {
           aria-valuenow={stats.percent}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Overall completion"
+          aria-label="How much you have finished"
         >
           <div
             className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-700 ease-out", BAR_TONE[stats.tone])}
@@ -61,7 +66,7 @@ export function ProgressPanel({ stats }) {
               )}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[11px] text-ink-muted truncate">{LABELS[s.key]}</span>
+                <span className="text-[11px] text-ink-muted truncate">{LABELS[s.key] || s.key}</span>
                 {s.complete && <Check className="w-3.5 h-3.5 text-success flex-none" />}
               </div>
               <div className="text-sm font-medium tabular-nums">

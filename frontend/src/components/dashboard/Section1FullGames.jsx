@@ -65,8 +65,8 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
     <SectionShell
       icon={Video}
       index={1}
-      title="Full game recordings"
-      description="Whole matches, not clips. Real competitive games so your editor can cut from the source."
+      title="Your full games"
+      description="Whole games, start to finish. Not clips. Your editor cuts your best bits out of these, so nothing happens without them."
       count={games.length}
       target={TARGETS.fullGames}
       action={!adminMode && (
@@ -78,10 +78,10 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
       {games.length === 0 ? (
         <EmptyState
           icon={Video}
-          title="No full games yet"
+          title="No games yet"
           description={adminMode
             ? "This player has not added any full matches."
-            : "Add the link to a full match recording. Google Drive, YouTube — anywhere we can open it."}
+            : "Paste the link to a full game. Google Drive, YouTube, anywhere we can open it."}
           actionText={!adminMode ? 'Add your first game' : null}
           onAction={openAdd}
         />
@@ -117,28 +117,28 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
         <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? 'Edit full game' : 'Add a full game'}>
           <form onSubmit={save} className="space-y-4">
             <Input
-              label="What was the game?"
-              placeholder="e.g. League match vs FC Athens"
+              label="Who did you play?"
+              placeholder="League game vs FC Athens"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               required
               autoFocus
             />
             <Input
-              label="Link to the recording"
+              label="Paste the link"
               placeholder="https://drive.google.com/..."
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
               required
               error={form.link && warning ? warning : undefined}
-              hint={!form.link ? 'Paste a Drive or YouTube link. Make sure it is set so anyone with the link can view it.' : undefined}
+              hint={!form.link ? 'A Google Drive or YouTube link. Set it so anyone with the link can watch it.' : undefined}
             />
             <Input
-              label="Date of the match"
+              label="When was it?"
               type="date"
               value={form.date}
               onChange={(e) => setForm({ ...form, date: e.target.value })}
-              hint="Optional."
+              hint="You can skip this."
             />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="fg-notes" className="text-[13px] font-medium text-ink-muted">Anything we should know</label>
@@ -146,7 +146,7 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
                 id="fg-notes"
                 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink placeholder:text-ink-faint
                            focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 min-h-[88px] transition-all"
-                placeholder="e.g. My best game this season. I am number 7, playing right wing."
+                placeholder="My best game this year. I am number 7, right wing."
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />

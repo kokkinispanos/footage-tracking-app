@@ -22,7 +22,7 @@ const firebaseConfig = {
   measurementId: "G-VV3QKQFNDL"
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 
 /**
  * Firestore, with an on-device cache.
@@ -94,10 +94,9 @@ export const offlineStorageAvailable = (async () => {
 export const auth = getAuth(app);
 
 /**
- * Storage is deliberately NOT initialised here yet.
+ * Storage is loaded on demand, not here.
  *
- * Nothing uploads a file until the hub sections land, and importing `firebase/storage`
- * costs every player a chunk of download on a phone for a feature that does not exist.
- * `storage.rules` is already written and published; when the first upload screen is built,
- * add `getStorage(app)` back — ideally behind a dynamic import in that screen alone.
+ * `services/files.js` imports `firebase/storage` dynamically the first time a player picks
+ * a file. Most sessions never touch an upload, and a phone on a ground's wifi should not
+ * pay for that download to look at a list of clips.
  */

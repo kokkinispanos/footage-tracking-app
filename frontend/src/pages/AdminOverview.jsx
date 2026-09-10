@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ArrowRight, RefreshCw, ShieldAlert, Link2, Users, Clock } from 'lucide-react';
+import { Search, ArrowRight, RefreshCw, ShieldAlert, Link2, Users, Clock, Rocket } from 'lucide-react';
 import { dbService } from '../services/db';
 import { useAuth } from '../context/AuthContext';
-import { calculateCompletion, createdAtMs } from '../utils/completion';
+import { createdAtMs } from '../utils/completion';
+import { calculateEverything, readiness } from '../utils/hubCompletion';
 import { describeActivity, lastActiveMs } from '../utils/activity';
 import { AppHeader } from '../components/ui/AppHeader';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -103,7 +104,7 @@ function LegacyPanel({ legacy, players, onLinked }) {
             {stillHoldingPasswords.length > 0 && (
               <> <span className="text-warning">
                 {stillHoldingPasswords.length} still hold{stillHoldingPasswords.length === 1 ? 's' : ''} a
-                password saved by the old app — clear it now.
+                password saved by the old app. Clear it now.
               </span></>
             )}
           </p>
@@ -148,7 +149,7 @@ function LegacyPanel({ legacy, players, onLinked }) {
                     <Link2 className="w-3.5 h-3.5" /> Bring across
                   </Button>
                 ) : unverifiedClaimFor(record) ? (
-                  <StatusPill tone="warning">Registered — waiting for him to confirm his email</StatusPill>
+                  <StatusPill tone="warning">Registered, waiting for him to confirm his email</StatusPill>
                 ) : (
                   <StatusPill tone="neutral">Waiting for him to register</StatusPill>
                 )}
@@ -191,14 +192,16 @@ export function AdminOverview() {
   const rows = useMemo(() => {
     const enriched = active.map((p) => ({
       ...p,
-      stats: calculateCompletion(p),
+      stats: calculateEverything(p),
       activity: describeActivity(p),
+      ready: readiness(p),
     }));
     return enriched
       .filter((p) => !search || label(p.profile?.fullName).toLowerCase().includes(search.toLowerCase())
                              || label(p.profile?.email).toLowerCase().includes(search.toLowerCase()))
       .filter((p) => !positionFilter || label(p.profile?.position) === positionFilter)
       .sort((a, b) => {
+        if (sortBy === 'closest') return a.ready.missing.length - b.ready.missing.length;
         if (sortBy === 'quietest') return lastActiveMs(a) - lastActiveMs(b);
         if (sortBy === 'newest') return createdAtMs(b) - createdAtMs(a);
         if (sortBy === 'az') return label(a.profile?.fullName).localeCompare(label(b.profile?.fullName));
@@ -210,6 +213,11 @@ export function AdminOverview() {
   // "Quiet" is 14 days with no sign of life. Worth a message, not yet a problem.
   const quietCount = useMemo(
     () => active.filter((p) => describeActivity(p).quiet).length,
+    [active]
+  );
+
+  const readyCount = useMemo(
+    () => active.filter((p) => readiness(p).ready).length,
     [active]
   );
 
@@ -238,6 +246,11 @@ export function AdminOverview() {
         <div className="flex flex-wrap items-baseline gap-3">
           <h1 className="text-2xl sm:text-3xl font-semibold">Players</h1>
           <StatusPill tone="brand">{active.length} registered</StatusPill>
+          {readyCount > 0 && (
+            <StatusPill tone="success">
+              <Rocket className="w-3 h-3" /> {readyCount} ready for Stage 3
+            </StatusPill>
+          )}
           {quietCount > 0 && (
             <StatusPill tone="warning">
               <Clock className="w-3 h-3" /> {quietCount} quiet for 2 weeks+
@@ -276,6 +289,7 @@ export function AdminOverview() {
               className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/40"
             >
               <option value="least_complete" className="bg-elevated">Needs chasing first</option>
+              <option value="closest" className="bg-elevated">Closest to Stage 3 first</option>
               <option value="quietest" className="bg-elevated">Quietest first</option>
               <option value="most_complete" className="bg-elevated">Most complete first</option>
               <option value="newest" className="bg-elevated">Newest first</option>
@@ -313,6 +327,11 @@ export function AdminOverview() {
                         {player.profile?.position && (
                           <StatusPill>{label(player.profile.position)}</StatusPill>
                         )}
+                        <StatusPill tone={player.ready.ready ? 'success' : 'neutral'}>
+                          {player.ready.ready
+                            ? 'Ready for Stage 3'
+                            : `${player.ready.missing.length} missing for Stage 3`}
+                        </StatusPill>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap mt-1">
                         <span className="text-xs text-ink-faint truncate">{label(player.profile?.email)}</span>

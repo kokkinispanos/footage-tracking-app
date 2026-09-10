@@ -12,11 +12,11 @@ function SaveIndicator({ status, online, durable }) {
     // closes his tab believing his work is safe when it is about to vanish.
     return durable ? (
       <span className="flex items-center gap-1.5 text-[11px] text-warning bg-warning/10 border border-warning/25 px-2.5 py-1 rounded-full">
-        <CloudOff className="w-3 h-3" /> Offline — saved on this device
+        <CloudOff className="w-3 h-3" /> Offline, saved on your phone
       </span>
     ) : (
       <span className="flex items-center gap-1.5 text-[11px] text-error bg-error/10 border border-error/25 px-2.5 py-1 rounded-full">
-        <CloudOff className="w-3 h-3" /> Offline — keep this tab open
+        <CloudOff className="w-3 h-3" /> Offline, keep this page open
       </span>
     );
   }

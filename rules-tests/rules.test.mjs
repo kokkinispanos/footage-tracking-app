@@ -270,6 +270,50 @@ await check('a properly shaped write still goes through', () =>
     'profile.fullName': 'A Real Name', updatedAt: serverTimestamp(),
   })));
 
+section('The hub sections');
+
+await check('he can fill in who he is', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    identity: {
+      dateOfBirth: '2006-04-02',
+      passportOne: { country: 'Nigeria', expiry: '2030-01-01', file: { name: 'p.jpg', size: 900, type: 'image/jpeg' } },
+      euFamily: { has: 'yes', relation: 'grandmother', country: 'Ireland' },
+      workStatus: 'needs-visa',
+      consents: { shareContact: { agreed: true, at: '2026-09-10T00:00:00.000Z' } },
+    },
+    updatedAt: serverTimestamp(),
+  })));
+
+await check('he can fill in his numbers, contact, finished work and platforms', () =>
+  assertSucceeds(updateDoc(doc(a, 'players', PLAYER_A), {
+    playerCard: { heightCm: '186', foot: 'right', languages: ['English'], numbers: { topSpeedKmh: '33' } },
+    contact: { phone: '+44 7700 900000', gmailForClubs: 'player@gmail.com', parent: { name: 'Ada' } },
+    deliverables: { highlightReel: { link: 'https://youtu.be/x' }, cv: { file: { name: 'cv.pdf' } } },
+    platforms: { transfermarkt: { status: 'live', link: 'https://transfermarkt.com/x' } },
+    updatedAt: serverTimestamp(),
+  })));
+
+await check('a hub section cannot be a string', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { identity: 'not a map' })));
+
+await check('a hub section cannot be a list', () =>
+  assertFails(updateDoc(doc(a, 'players', PLAYER_A), { platforms: ['nope'] })));
+
+await check('a player still cannot touch another player hub sections', () =>
+  assertFails(updateDoc(doc(b, 'players', PLAYER_A), { identity: { dateOfBirth: '2000-01-01' } })));
+
+await check('the coach can tick the reel sign-off on a player record', () =>
+  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
+    'deliverables.highlightReel.approvedByCoach': { done: true, at: '2026-09-10T00:00:00.000Z' },
+    updatedAt: serverTimestamp(),
+  })));
+
+await check('the coach can set the proof page link', () =>
+  assertSucceeds(updateDoc(doc(admin, 'players', PLAYER_A), {
+    'deliverables.proofPage.link': 'https://proplacement.cloud/p/matt',
+    updatedAt: serverTimestamp(),
+  })));
+
 // ============================================================ signing up
 section('A brand-new account creating its record');
 

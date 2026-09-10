@@ -87,7 +87,7 @@ export function Account() {
     e.preventDefault();
     setDetailsStatus({});
     if (!form.fullName.trim()) {
-      setDetailsStatus({ error: 'Your name cannot be empty.' });
+      setDetailsStatus({ error: 'Put your name in.' });
       return;
     }
     setSavingDetails(true);
@@ -97,7 +97,7 @@ export function Account() {
       setDetailsStatus({ done: 'Saved.' });
       setDetails(null);
     } catch (err) {
-      setDetailsStatus({ error: err?.message || 'Could not save that. Try again.' });
+      setDetailsStatus({ error: err?.message || 'That did not save. Try again.' });
     } finally {
       setSavingDetails(false);
     }
@@ -107,17 +107,17 @@ export function Account() {
     e.preventDefault();
     setEmailStatus({});
     const next = emailForm.newEmail.trim().toLowerCase();
-    if (!next) return setEmailStatus({ error: 'Type the new email address.' });
+    if (!next) return setEmailStatus({ error: 'Type the new email.' });
     if (next === (user?.email || '').toLowerCase()) {
-      return setEmailStatus({ error: 'That is already your email address.' });
+      return setEmailStatus({ error: 'That is the one you already use.' });
     }
-    if (!emailForm.password) return setEmailStatus({ error: 'Type your current password.' });
+    if (!emailForm.password) return setEmailStatus({ error: 'Type your password.' });
 
     setSavingEmail(true);
     try {
       await authService.changeEmail(emailForm.password, next);
       setEmailStatus({
-        done: `Check ${next}. Your email changes as soon as you click the link we just sent there — until then you keep signing in with the old one.`,
+        done: `Go and check ${next}. We sent a link there. Click it and your email changes. Until then, keep signing in with the old one.`,
       });
       setEmailForm({ newEmail: '', password: '' });
     } catch (err) {
@@ -131,15 +131,15 @@ export function Account() {
     e.preventDefault();
     setPwStatus({});
     if (pwForm.next.length < MIN_PASSWORD) {
-      return setPwStatus({ error: `Use at least ${MIN_PASSWORD} characters.` });
+      return setPwStatus({ error: `Make it ${MIN_PASSWORD} letters or more.` });
     }
     if (pwForm.next !== pwForm.confirm) {
-      return setPwStatus({ error: 'The two new passwords do not match.' });
+      return setPwStatus({ error: 'The two new passwords are not the same.' });
     }
     setSavingPw(true);
     try {
       await authService.changePassword(pwForm.current, pwForm.next);
-      setPwStatus({ done: 'Password changed. It works from your next sign-in.' });
+      setPwStatus({ done: 'Done. Use the new one next time you sign in.' });
       setPwForm({ current: '', next: '', confirm: '' });
     } catch (err) {
       setPwStatus({ error: readableAuthError(err) });
@@ -179,7 +179,7 @@ export function Account() {
         <Panel
           icon={User}
           title="Your details"
-          description="Your name as it should appear to a club, and the position you want to be seen in."
+          description="Your name the way a club should see it, and the position you want to be picked for."
           status={detailsStatus}
         >
           <form onSubmit={saveDetails} className="space-y-4">
@@ -187,7 +187,7 @@ export function Account() {
               label="Full name"
               value={form.fullName}
               onChange={(e) => setForm({ fullName: e.target.value })}
-              hint="As it appears on your passport."
+              hint="Spell it like your passport does."
             />
 
             <div className="flex flex-col gap-1.5">
@@ -207,13 +207,13 @@ export function Account() {
               </select>
               {keeperSwitch ? (
                 <span className="text-xs text-warning">
-                  Goalkeepers and outfield players are asked for different skill clips. Nothing you
-                  have already added is deleted — clips from the other set stay saved and appear in
-                  your export.
+                  Keepers and outfield players get asked for different skill clips. Nothing you
+                  already added is deleted. The other ones stay saved and still come out in your
+                  download.
                 </span>
               ) : (
                 <span className="text-xs text-ink-faint">
-                  This decides which skill categories you are asked for.
+                  This changes which skill clips we ask you for.
                 </span>
               )}
             </div>
@@ -228,7 +228,7 @@ export function Account() {
         <Panel
           icon={AtSign}
           title="Sign-in email"
-          description={`You sign in with ${user?.email}. Everything we send you goes there.`}
+          description={`You sign in with ${user?.email}. Everything we send goes there.`}
           status={emailStatus}
         >
           <form onSubmit={changeEmail} className="space-y-4">
@@ -241,12 +241,12 @@ export function Account() {
               placeholder="you@example.com"
             />
             <Input
-              label="Your current password"
+              label="Your password right now"
               type="password"
               autoComplete="current-password"
               value={emailForm.password}
               onChange={(e) => setEmailForm({ ...emailForm, password: e.target.value })}
-              hint="We ask so that nobody who finds your screen unlocked can move your account."
+              hint="We ask so nobody who finds your phone unlocked can take your account."
             />
             <Button type="submit" variant="secondary" loading={savingEmail}>
               Send the confirmation link
@@ -258,7 +258,7 @@ export function Account() {
         <Panel
           icon={KeyRound}
           title="Password"
-          description="Use one you do not use anywhere else."
+          description="Use one you do not use for anything else."
           status={pwStatus}
         >
           <form onSubmit={changePassword} className="space-y-4">
@@ -275,7 +275,7 @@ export function Account() {
               autoComplete="new-password"
               value={pwForm.next}
               onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
-              hint={`At least ${MIN_PASSWORD} characters.`}
+              hint={`${MIN_PASSWORD} letters or more.`}
             />
             <Input
               label="New password again"
@@ -293,24 +293,24 @@ export function Account() {
         {/* -------------------------------------------------------------- data */}
         <Panel
           icon={Download}
-          title="Take your data with you"
-          description="Everything you have put in here is yours. Download it whenever you like — you do not need to ask us."
+          title="Take a copy of your stuff"
+          description="Everything in here belongs to you. Download it any time. You do not have to ask us."
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <Button variant="secondary" onClick={() => downloadLinkSheet(playerData)} className="gap-2">
-              <FileText className="w-4 h-4" /> Download as a list
+              <FileText className="w-4 h-4" /> Download the list
             </Button>
             <Button variant="secondary" onClick={() => downloadRawJson(playerData)} className="gap-2">
-              <Download className="w-4 h-4" /> Download raw data
+              <Download className="w-4 h-4" /> Download the raw file
             </Button>
             <Button variant="ghost" onClick={copy} className="gap-2 sm:col-span-2">
               {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied to your clipboard' : 'Copy the list to send to someone'}
+              {copied ? 'Copied' : 'Copy the list so you can send it'}
             </Button>
           </div>
           <p className="text-xs text-ink-faint leading-relaxed">
-            The list is the readable one — every link grouped by section, with what is still
-            missing at the bottom. The raw file is everything exactly as it is stored.
+            The list is the easy one to read. Every link, sorted, with what is still missing at
+            the bottom. The raw file is everything exactly how we keep it.
           </p>
         </Panel>
       </main>

@@ -74,8 +74,8 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNot
     <SectionShell
       icon={Star}
       index={2}
-      title="Your top 3 clips"
-      description="The three moments that open your highlight video. A scout decides in the first 30 seconds — these are that 30 seconds. Order matters: number 1 plays first."
+      title="Your best 3 clips"
+      description="The first three things a scout sees. Most of them decide in half a minute, and this is that half minute. Number 1 plays first, so put your best one there."
       count={clips.length}
       target={TARGETS.topThreeClips}
       action={!adminMode && (
@@ -147,14 +147,14 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNot
           <form onSubmit={save} className="space-y-4">
             <Input
               label="What happens in it?"
-              placeholder="e.g. Long-range goal vs Olympiacos U19"
+              placeholder="Goal from outside the box vs Olympiacos U19"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
               autoFocus
             />
             <Input
-              label="Link to the clip"
+              label="Paste the link"
               placeholder="https://drive.google.com/..."
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
@@ -179,7 +179,7 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNot
                 id="tc-why"
                 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-ink placeholder:text-ink-faint
                            focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60 min-h-[88px] transition-all"
-                placeholder="e.g. Shows my shooting power and that I stay calm under pressure."
+                placeholder="It shows how hard I strike it, and that I stay calm."
                 value={form.whyBest}
                 onChange={(e) => setForm({ ...form, whyBest: e.target.value })}
               />

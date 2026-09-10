@@ -36,9 +36,9 @@ export class ErrorBoundary extends React.Component {
           </div>
           <h1 className="text-xl font-semibold mb-2">This screen would not load</h1>
           <p className="text-sm text-ink-muted leading-relaxed mb-6">
-            Something went wrong at our end. <strong className="text-ink">Nothing you saved is
-            lost</strong> — your work is stored on our side, not on this page. Reload, and if it
-            keeps happening tell Pro Placement.
+            Something broke on our side. <strong className="text-ink">Nothing you saved is
+            gone.</strong> Your work is kept safely, not on this page. Try reloading. If it keeps
+            happening, tell Pro Placement.
           </p>
           <button
             onClick={() => window.location.assign('/')}
