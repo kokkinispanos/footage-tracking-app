@@ -504,6 +504,39 @@ Toolkit from the deployed origin: it rejects on the token, not the origin.
 
 ---
 
+## Checkpoint 3d — the link box, and three more of the same bug (2026-09-10) ✅ DONE
+
+Panos reported it took "10 to 12 clicks" to get his cursor into the link box.
+
+**The modal was stealing focus on every keystroke.** `onClose` is written inline as
+`() => setIsOpen(false)`, so it is a new function on every render, and it was in the effect's
+dependency list. The effect re-ran constantly, and the line inside it that focuses the first
+field dragged the cursor back there each time. The callback is held in a ref now and the effect
+depends on `isOpen` alone. Measured after: typing twenty characters steals focus **zero** times.
+
+**Pasting a link is now one tap.** New `LinkInput`, used everywhere a player pastes a link. It
+has a Paste button, it opens with the cursor already in it, it says what it recognised
+("YouTube link", "Google Drive link"), and it says the one thing that will silently ruin the
+link later. **YouTube and Google Drive are both first class on purpose:** three full games in 4K
+will not fit in a free Drive, and a player told "Drive only" simply sends nothing. Vimeo, Veo,
+Hudl and Dropbox are recognised too.
+
+> The most valuable line in that box: **a YouTube video set to Private cannot be opened by the
+> editor.** Unlisted is what he wants. The app cannot detect it, so it has to say it.
+
+**Two more instances of the containing-block bug from 3c**, found by sweeping rather than by
+waiting: the header menu's click-catcher was `fixed` inside a sticky header that has
+`backdrop-blur`, so it only covered the header strip and clicking the page below did not close
+the menu. And confirm dialogs had stopped focusing their button, so Enter did nothing. Both
+fixed. A competing second `autoFocus` in two modals was removed so the link box wins.
+
+The link field is `required` again. It lost that in the swap, and a saved row with no link
+counts for nothing and confuses whoever reads it later.
+
+93 rule tests, all passing.
+
+---
+
 ## Checkpoint 4 — the CV generator
 
 Panos's idea: hand a Claude session one player's hub data plus his standard CV template, and get

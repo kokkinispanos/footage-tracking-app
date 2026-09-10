@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, LogOut, Loader2, AlertTriangle, ChevronDown, Settings, CloudOff } from 'lucide-react';
 import { Wordmark } from './Brand';
@@ -79,7 +80,14 @@ export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, acc
 
               {menuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  {/* Portalled. This header is sticky WITH a backdrop-blur, and an ancestor
+                      with a backdrop-filter becomes the containing block for `fixed`, so this
+                      catcher only covered the header strip. Clicking anywhere in the page
+                      below did not close the menu. */}
+                  {createPortal(
+                    <div className="fixed inset-0 z-[90]" onClick={() => setMenuOpen(false)} />,
+                    document.body,
+                  )}
                   <div className="absolute right-0 mt-2 w-52 z-20 bg-elevated border border-white/10 rounded-xl shadow-2xl p-1.5 animate-riseIn">
                     <div className="px-3 py-2 text-xs text-ink-faint border-b border-white/[0.07] mb-1 truncate">
                       {userName}

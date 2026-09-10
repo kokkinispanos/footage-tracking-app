@@ -4,13 +4,14 @@ import { Film, Plus, ChevronDown } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { LinkInput } from '../ui/LinkInput';
 import { Modal } from '../ui/Modal';
 import { ModalActions } from '../ui/ModalActions';
 import { useConfirm } from '../ui/ConfirmDialog';
 import { SectionShell } from './SectionShell';
 import { ItemRow } from './ItemRow';
 import { AdminNoteField } from './AdminNoteField';
-import { normalizeUrl, linkWarning } from '../../utils/links';
+import { normalizeUrl } from '../../utils/links';
 import { TARGETS, countSkillClips } from '../../utils/completion';
 import { cn } from '../../utils/cn';
 import { FIELD_CATEGORIES, GK_CATEGORIES, KEY_FOR_POSITION, isGoalkeeper } from '../../utils/catalog';
@@ -33,7 +34,6 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
   const keyCats = KEY_FOR_POSITION[position] || [];
   const clips = playerData?.skillClips || {};
   const total = countSkillClips(playerData);
-  const warning = linkWarning(form.link);
 
   const openAdd = (catKey) => {
     setActiveCat(catKey); setForm({ link: '', notes: '' }); setEditingId(null); setIsOpen(true);
@@ -165,14 +165,10 @@ export function Section3SkillClips({ adminMode, overrideData, adminDocId, adminN
       {!adminMode && (
         <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={editingId ? `Edit ${activeLabel} clip` : `Add a ${activeLabel} clip`}>
           <form onSubmit={save} className="space-y-4">
-            <Input
-              label="Paste the link"
-              placeholder="https://drive.google.com/..."
+            <LinkInput
               value={form.link}
-              onChange={(e) => setForm({ ...form, link: e.target.value })}
-              required
+              onChange={(link) => setForm({ ...form, link })}
               autoFocus
-              error={form.link && warning ? warning : undefined}
             />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="sc-notes" className="text-[13px] font-medium text-ink-muted">What are we looking at?</label>

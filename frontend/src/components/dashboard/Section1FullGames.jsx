@@ -4,6 +4,7 @@ import { Plus, Video } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { LinkInput } from '../ui/LinkInput';
 import { EmptyState } from '../ui/EmptyState';
 import { Modal } from '../ui/Modal';
 import { ModalActions } from '../ui/ModalActions';
@@ -12,7 +13,7 @@ import { StatusPill } from '../ui/Brand';
 import { SectionShell } from './SectionShell';
 import { ItemRow } from './ItemRow';
 import { AdminNoteField } from './AdminNoteField';
-import { normalizeUrl, linkWarning } from '../../utils/links';
+import { normalizeUrl } from '../../utils/links';
 import { TARGETS } from '../../utils/completion';
 
 const BLANK = { link: '', label: '', date: '', notes: '' };
@@ -28,7 +29,6 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
   const { confirm, dialog } = useConfirm();
 
   const games = playerData?.fullGames || [];
-  const warning = linkWarning(form.link);
 
   const openAdd = () => { setForm(BLANK); setEditingId(null); setIsOpen(true); };
   const openEdit = (item) => { setForm({ ...BLANK, ...item }); setEditingId(item.id); setIsOpen(true); };
@@ -123,16 +123,12 @@ export function Section1FullGames({ adminMode, overrideData, adminDocId, adminNo
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               required
-              autoFocus
             />
-            <Input
-              label="Paste the link"
-              placeholder="https://drive.google.com/..."
+            <LinkInput
               value={form.link}
-              onChange={(e) => setForm({ ...form, link: e.target.value })}
-              required
-              error={form.link && warning ? warning : undefined}
-              hint={!form.link ? 'A Google Drive or YouTube link. Set it so anyone with the link can watch it.' : undefined}
+              onChange={(link) => setForm({ ...form, link })}
+              autoFocus
+              hint="A YouTube or Google Drive link. Use whichever you have room for. A full game in 4K will not fit in a free Drive, and YouTube is free and unlimited."
             />
             <Input
               label="When was it?"

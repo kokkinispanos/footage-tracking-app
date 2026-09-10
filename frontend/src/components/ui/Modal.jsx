@@ -18,18 +18,38 @@ import { cn } from "../../utils/cn";
 export function Modal({ isOpen, onClose, title, children, className }) {
   const panelRef = useRef(null);
 
+  // `onClose` is almost always written inline as `() => setIsOpen(false)`, so it is a NEW
+  // function on every render. Keeping it in the dependency list re-ran this whole effect on
+  // every keystroke, and the focus line below then dragged the cursor back to the first field
+  // each time. Typing a link took a dozen attempts. The ref holds the latest callback without
+  // making the effect depend on its identity.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    if (!isOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current?.(); };
     document.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    panelRef.current?.querySelector('input, textarea, select, button')?.focus?.();
+
+    // Once, when it opens. Prefer a field marked `data-autofocus` so a form can say which box
+    // the player actually came here to fill in; otherwise the first one.
+    const panel = panelRef.current;
+    const target = panel?.querySelector('[data-autofocus]')
+      || panel?.querySelector('input, textarea, select')
+      // A confirm dialog has no fields. Focus its first real button so Enter still answers it.
+      || panel?.querySelector('button:not([aria-label="Close"])');
+    // A frame later, so the sheet has finished animating in and the phone keyboard does not
+    // open against a moving target.
+    const raf = requestAnimationFrame(() => target?.focus?.({ preventScroll: true }));
+
     return () => {
+      cancelAnimationFrame(raf);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

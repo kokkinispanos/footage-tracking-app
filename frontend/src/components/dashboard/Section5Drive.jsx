@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { FolderUp, CheckCircle2, ExternalLink } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Input } from '../ui/Input';
+import { LinkInput } from '../ui/LinkInput';
 import { Button } from '../ui/Button';
 import { SectionShell } from './SectionShell';
 import { AdminNoteField } from './AdminNoteField';
-import { normalizeUrl, linkWarning, prettyUrl } from '../../utils/links';
+import { normalizeUrl, prettyUrl } from '../../utils/links';
 
 const SUBFOLDERS = [
   '01_Full_Games',
@@ -25,7 +26,6 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
 
   const link = playerData?.driveFolder?.link || '';
   const isFilled = link.trim().length > 0;
-  const warning = linkWarning(draft);
 
   const save = () => {
     updateSection('driveFolder', () => ({ link: normalizeUrl(draft) }));
@@ -44,13 +44,12 @@ export function Section5Drive({ adminMode, overrideData, adminDocId, adminNotes 
       <div className="rounded-xl border border-white/[0.07] bg-black/20 p-5">
         {!adminMode && isEditing ? (
           <div className="space-y-3">
-            <Input
+            <LinkInput
               label="Paste the folder link"
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={setDraft}
               placeholder="https://drive.google.com/drive/folders/..."
               autoFocus
-              error={draft && warning ? warning : undefined}
               hint="In Drive: right click the folder, tap Share, then Copy link. Change it to 'Anyone with the link'."
             />
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">

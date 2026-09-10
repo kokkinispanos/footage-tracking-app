@@ -4,6 +4,7 @@ import { Plus, Star } from 'lucide-react';
 import { usePlayer } from '../../context/PlayerContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { LinkInput } from '../ui/LinkInput';
 import { Modal } from '../ui/Modal';
 import { ModalActions } from '../ui/ModalActions';
 import { useConfirm } from '../ui/ConfirmDialog';
@@ -11,7 +12,7 @@ import { StatusPill } from '../ui/Brand';
 import { SectionShell } from './SectionShell';
 import { ItemRow } from './ItemRow';
 import { AdminNoteField } from './AdminNoteField';
-import { normalizeUrl, linkWarning } from '../../utils/links';
+import { normalizeUrl } from '../../utils/links';
 import { TARGETS } from '../../utils/completion';
 import { cn } from '../../utils/cn';
 
@@ -34,7 +35,6 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNot
 
   const clips = playerData?.topThreeClips || [];
   const full = clips.length >= 3;
-  const warning = linkWarning(form.link);
 
   const openAdd = () => {
     if (full) return;
@@ -152,15 +152,11 @@ export function Section2TopClips({ adminMode, overrideData, adminDocId, adminNot
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
-              autoFocus
             />
-            <Input
-              label="Paste the link"
-              placeholder="https://drive.google.com/..."
+            <LinkInput
               value={form.link}
-              onChange={(e) => setForm({ ...form, link: e.target.value })}
-              required
-              error={form.link && warning ? warning : undefined}
+              onChange={(link) => setForm({ ...form, link })}
+              autoFocus
             />
             <div className="flex flex-col gap-1.5">
               <label htmlFor="tc-cat" className="text-[13px] font-medium text-ink-muted">Which skill does it show?</label>

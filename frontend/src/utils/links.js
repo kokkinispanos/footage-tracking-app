@@ -37,8 +37,10 @@ export function isValidUrl(raw) {
 export function linkWarning(raw) {
   const value = normalizeUrl(raw);
   if (!value) return null;
-  if (!isValidUrl(value)) return 'That does not look like a web address.';
+  // The specific complaints come first, because "that is not a web address" is true of a
+  // localhost link but tells the player nothing he can act on.
   if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(value)) return 'That link only works on your own computer.';
+  if (!isValidUrl(value)) return 'That does not look like a web address.';
   if (/drive\.google\.com\/drive\/u\/\d+\//i.test(value)) {
     return 'This is your personal Drive view. Use "Share" then "Copy link" instead, or we cannot open it.';
   }
@@ -50,4 +52,55 @@ export function linkWarning(raw) {
 export function prettyUrl(raw, max = 52) {
   const value = asString(raw).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+/**
+ * What kind of link is this, and what is the one thing likely to go wrong with it?
+ *
+ * Both YouTube and Google Drive are first-class here, deliberately. A player filming three
+ * full games in 4K will not have the Drive space for them, and telling him "Drive only"
+ * would just stop him sending anything. YouTube is free and unlimited.
+ *
+ * The sharing note matters more than the platform. Every one of these can be uploaded
+ * perfectly and still be unopenable by the editor, and that failure is silent: the player
+ * pastes a link that works fine for HIM and hears nothing back for a week.
+ */
+export function describeLink(raw) {
+  const value = normalizeUrl(raw);
+  if (!value || !isValidUrl(value)) return null;
+
+  let host = '';
+  try { host = new URL(value).hostname.replace(/^www\./, '').toLowerCase(); } catch { return null; }
+
+  if (host.endsWith('youtube.com') || host === 'youtu.be') {
+    return {
+      kind: 'youtube',
+      label: 'YouTube',
+      note: 'Set it to Unlisted or Public. Private means only you can watch it, and your editor will not be able to open it.',
+    };
+  }
+  if (host.endsWith('drive.google.com') || host.endsWith('docs.google.com')) {
+    return {
+      kind: 'drive',
+      label: 'Google Drive',
+      note: 'Press Share and set it to "Anyone with the link". Otherwise it asks us for permission and we cannot get in.',
+    };
+  }
+  if (host.endsWith('vimeo.com')) {
+    return { kind: 'vimeo', label: 'Vimeo', note: 'Make sure it is not password locked.' };
+  }
+  if (host.endsWith('veo.co') || host.includes('veo')) {
+    return { kind: 'veo', label: 'Veo', note: 'Use the share link, not the one from your own dashboard.' };
+  }
+  if (host.endsWith('hudl.com')) {
+    return { kind: 'hudl', label: 'Hudl', note: 'Use the share link so anyone can open it.' };
+  }
+  if (host.endsWith('dropbox.com')) {
+    return { kind: 'dropbox', label: 'Dropbox', note: 'Use a share link that anyone can open.' };
+  }
+  return {
+    kind: 'other',
+    label: host,
+    note: 'Open it in a private browser window first. If it asks you to log in, we cannot see it either.',
+  };
 }
