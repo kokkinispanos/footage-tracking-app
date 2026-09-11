@@ -123,12 +123,21 @@ export const authService = {
    */
   async logout() {
     await signOut(auth);
-    try {
-      await terminate(db);
-      await clearIndexedDbPersistence(db);
-    } catch {
-      // Another tab has it open, or persistence never started. The reload still follows.
-    }
+    // Bounded as well as best effort. The caller reloads the page once this returns, so a
+    // cleanup that hung would leave someone pressing a Sign out button that does nothing.
+    // 2.5 seconds is plenty for a healthy clear; past that, the reload wins. The sign-out
+    // itself has already happened either way.
+    await Promise.race([
+      (async () => {
+        try {
+          await terminate(db);
+          await clearIndexedDbPersistence(db);
+        } catch {
+          // Another tab has it open, or persistence never started. The reload still follows.
+        }
+      })(),
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ]);
   },
 
   async sendReset(email) {

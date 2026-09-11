@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, LogOut, Loader2, AlertTriangle, ChevronDown, Settings, CloudOff } from 'lucide-react';
 import { Wordmark } from './Brand';
@@ -47,8 +46,39 @@ function SaveIndicator({ status, online, durable }) {
 
 export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, accountLink = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const triggerRef = useRef(null);
   const online = useOnlineStatus();
   const durable = useDurableOffline();
+
+  // Close the menu on any press outside it, and on Escape.
+  //
+  // This used to be a full-screen click-catcher portalled to <body>. It had to be portalled,
+  // because the header's backdrop-filter makes the header the containing block for `fixed`.
+  // But at z-[90] it then painted over the whole header, menu included, so every tap on
+  // "Sign out" landed on the catcher and the menu simply closed (found 2026-09-11). Any
+  // overlay has to sit either above the menu (blocks it) or below the header (misses presses
+  // on the header itself). A listener has neither problem. Capture phase, so a page element
+  // that stops propagation still closes the menu.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        // Focus was inside a menu that no longer exists; hand it back to the button that opened it.
+        triggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-50 bg-background/85 backdrop-blur-xl border-b border-white/[0.07]">
@@ -63,8 +93,9 @@ export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, acc
           {right}
 
           {userName && (
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
+                ref={triggerRef}
                 onClick={() => setMenuOpen((v) => !v)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/[0.06] transition-colors"
                 aria-expanded={menuOpen}
@@ -79,39 +110,33 @@ export function AppHeader({ subtitle, saveStatus, userName, onLogout, right, acc
               </button>
 
               {menuOpen && (
-                <>
-                  {/* Portalled. This header is sticky WITH a backdrop-blur, and an ancestor
-                      with a backdrop-filter becomes the containing block for `fixed`, so this
-                      catcher only covered the header strip. Clicking anywhere in the page
-                      below did not close the menu. */}
-                  {createPortal(
-                    <div className="fixed inset-0 z-[90]" onClick={() => setMenuOpen(false)} />,
-                    document.body,
-                  )}
-                  <div className="absolute right-0 mt-2 w-52 z-20 bg-elevated border border-white/10 rounded-xl shadow-2xl p-1.5 animate-riseIn">
-                    <div className="px-3 py-2 text-xs text-ink-faint border-b border-white/[0.07] mb-1 truncate">
-                      {userName}
-                    </div>
-                    {accountLink && (
-                      <Link
-                        to="/account"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[13px]
-                                   text-ink-muted hover:text-ink hover:bg-white/[0.06] transition-colors"
-                      >
-                        <Settings className="w-4 h-4" /> Your account
-                      </Link>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onLogout}
-                      className="w-full justify-start gap-2 text-ink-muted hover:text-error"
-                    >
-                      <LogOut className="w-4 h-4" /> Sign out
-                    </Button>
+                <div className="absolute right-0 mt-2 w-52 z-20 bg-elevated border border-white/10 rounded-xl shadow-2xl p-1.5 animate-riseIn">
+                  <div className="px-3 py-2 text-xs text-ink-faint border-b border-white/[0.07] mb-1 truncate">
+                    {userName}
                   </div>
-                </>
+                  {accountLink && (
+                    <Link
+                      to="/account"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[13px]
+                                 text-ink-muted hover:text-ink hover:bg-white/[0.06] transition-colors"
+                    >
+                      <Settings className="w-4 h-4" /> Your account
+                    </Link>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      // Close first, so the button cannot be pressed again while sign-out runs.
+                      setMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full justify-start gap-2 text-ink-muted hover:text-error"
+                  >
+                    <LogOut className="w-4 h-4" /> Sign out
+                  </Button>
+                </div>
               )}
             </div>
           )}

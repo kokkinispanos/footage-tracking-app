@@ -67,7 +67,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    try {
+      await authService.logout();
+    } catch (err) {
+      // signOut itself failed, so he is still signed in. Say so. A Sign out button that
+      // silently does nothing is exactly the bug this replaced (2026-09-11).
+      if (import.meta.env?.DEV) console.warn('[auth] sign out failed', err);
+      window.alert('We could not sign you out. Check your connection and try again.');
+      return;
+    }
     // A hard reload, not a route change: authService.logout() tears down the Firestore
     // instance to empty its cache, and every screen after this needs a live one.
     window.location.replace('/login');
